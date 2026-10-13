@@ -45,11 +45,26 @@ class CallService : Service(), SignalingClient.Listener {
     lateinit var contactStore: ContactStore
     lateinit var audioRouter: AudioRouter
 
-    var signalingClient: SignalingClient? = null
+    var signalingClient: ISignalingClient? = null
     var activeCallSession: CallSession? = null
     var currentInvite: CallInviteMessage? = null
     var iceServers: List<PeerConnection.IceServer> = listOf(
-        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
+        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer(),
+        PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer(),
+        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
+            .setUsername("openrelay")
+            .setPassword("openrelay")
+            .createIceServer(),
+        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443")
+            .setUsername("openrelay")
+            .setPassword("openrelay")
+            .createIceServer(),
+        PeerConnection.IceServer.builder("turns:openrelay.metered.ca:443?transport=tcp")
+            .setUsername("openrelay")
+            .setPassword("openrelay")
+            .createIceServer()
     )
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -73,7 +88,7 @@ class CallService : Service(), SignalingClient.Listener {
 
         net.registerNetworkCallback(
             onAvailable = {
-                Log.d(tag, "Network available, ensuring WebSocket connected")
+                Log.d(tag, "Network available, ensuring WebSocket/MQTT connected")
                 ensureConnected()
             },
             onLost = {
@@ -110,7 +125,17 @@ class CallService : Service(), SignalingClient.Listener {
     }
 
     fun ensureConnected() {
-        // In LAN mode on senior role, start local WebSocket server if not running
+        if (prefs.pairKey.isNotEmpty()) {
+            if (signalingClient == null) {
+                signalingClient = MqttSignalingClient(prefs.pairKey, prefs.role, this)
+                signalingClient?.connect()
+            } else if (signalingClient?.isConnected == false) {
+                signalingClient?.connect()
+            }
+            return
+        }
+
+        // Fallback for custom server or local mode
         if (prefs.role == "senior" && prefs.isLanMode) {
             val code = prefs.pairingCode ?: "123456"
             if (LocalSignalingServer.instance == null) {

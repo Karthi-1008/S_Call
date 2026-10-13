@@ -99,12 +99,7 @@ class FamilyMainActivity : AppCompatActivity(), SignalingClient.Listener {
             binding.tvFamilyElderStatus.setBackgroundColor(Color.parseColor("#FEE2E2"))
             binding.tvFamilyElderStatus.setTextColor(Color.parseColor("#DC2626"))
         } else {
-            if (prefs.isLanMode) {
-                // In LAN mode, connecting to Elder's WebSocket server implies Elder is running
-                binding.tvFamilyElderStatus.text = "🟢 Elder Status: Online (Home Wi-Fi)"
-                binding.tvFamilyElderStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
-                binding.tvFamilyElderStatus.setTextColor(Color.parseColor("#16A34A"))
-            } else if (isElderOnline) {
+            if (isElderOnline) {
                 binding.tvFamilyElderStatus.text = "🟢 Elder Status: Online"
                 binding.tvFamilyElderStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
                 binding.tvFamilyElderStatus.setTextColor(Color.parseColor("#16A34A"))
@@ -119,9 +114,6 @@ class FamilyMainActivity : AppCompatActivity(), SignalingClient.Listener {
     // SignalingClient.Listener Callbacks
     override fun onConnected(hello: HelloMessage) {
         runOnUiThread {
-            if (prefs.isLanMode) {
-                isElderOnline = true
-            }
             updateStatusDisplay()
         }
     }

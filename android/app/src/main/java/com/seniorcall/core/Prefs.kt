@@ -18,6 +18,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("is_lan_mode", true)
         set(value) = sp.edit().putBoolean("is_lan_mode", value).apply()
 
+    var pairKey: String
+        get() = sp.getString("pair_key", "") ?: ""
+        set(value) = sp.edit().putString("pair_key", value).apply()
+
     var userId: String?
         get() = sp.getString("user_id", null)
         set(value) = sp.edit().putString("user_id", value).apply()

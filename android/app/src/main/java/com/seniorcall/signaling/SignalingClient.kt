@@ -18,7 +18,7 @@ class SignalingClient(
     private val wsUrl: String,
     private val token: String,
     initialListener: Listener? = null
-) {
+) : ISignalingClient {
     interface Listener {
         fun onConnected(hello: HelloMessage) {}
         fun onDisconnected() {}
@@ -48,13 +48,13 @@ class SignalingClient(
         initialListener?.let { listeners.add(it) }
     }
 
-    fun addListener(l: Listener) {
+    override fun addListener(l: Listener) {
         if (!listeners.contains(l)) {
             listeners.add(l)
         }
     }
 
-    fun removeListener(l: Listener) {
+    override fun removeListener(l: Listener) {
         listeners.remove(l)
     }
 
@@ -69,7 +69,7 @@ class SignalingClient(
     private var isClosedManually = false
     private var reconnectAttempt = 0
 
-    var isConnected: Boolean = false
+    override var isConnected: Boolean = false
         private set
 
     private val heartbeatRunnable = object : Runnable {
@@ -79,7 +79,7 @@ class SignalingClient(
         }
     }
 
-    fun connect() {
+    override fun connect() {
         isClosedManually = false
         val urlWithToken = if (token.isNotBlank()) {
             if (wsUrl.contains("?")) "$wsUrl&token=$token" else "$wsUrl?token=$token"
@@ -131,12 +131,12 @@ class SignalingClient(
         mainHandler.postDelayed({ connect() }, delayMs)
     }
 
-    fun send(msg: Any) {
+    override fun send(msg: Any) {
         val json = if (msg is String) msg else gson.toJson(msg)
         webSocket?.send(json)
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         isClosedManually = true
         isConnected = false
         mainHandler.removeCallbacks(heartbeatRunnable)

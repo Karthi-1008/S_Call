@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - seniorcall-net
+
+  coturn:
+    image: coturn/coturn:latest
+    restart: always
+    network_mode: host
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    environment:
+      - DETECT_EXTERNAL_IP=yes
+
+  signaling:
+    build:
+      context: ./signaling
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - PORT=8080
+    depends_on:
+      - redis
+    networks:
+      - seniorcall-net
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../web-client:/srv/web-client:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - signaling
+    networks:
+      - seniorcall-net
+
+networks:
+  seniorcall-net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:

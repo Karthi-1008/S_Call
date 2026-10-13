@@ -1,0 +1,16 @@
+{
+  "name": "SeniorCall Family",
+  "short_name": "SeniorCall",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#16a34a",
+  "description": "Always-On Video & Audio Calling App for Family",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

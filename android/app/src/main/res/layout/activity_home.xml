@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootHome"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/senior_bg"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Top Bar: Clock, Date, Wi-Fi status banner (§8.3 A) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/tvHeaderLogo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:text="SeniorCall"
+            android:textColor="@color/senior_text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/tvClock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="12:00 PM"
+            android:textColor="@color/senior_text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Ready / Offline Status Banner -->
+    <TextView
+        android:id="@+id/tvStatusBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#DCFCE7"
+        android:gravity="center"
+        android:padding="12dp"
+        android:text="@string/status_ready"
+        android:textColor="@color/status_ready"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <!-- Contact Tiles Grid (2 columns) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvContactsGrid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        tools:listitem="@layout/item_contact_tile" />
+
+    <!-- Bottom Action Row: SOS / Emergency (§8.3 A) -->
+    <Button
+        android:id="@+id/btnSos"
+        style="@style/SeniorButton"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:background="@drawable/bg_btn_decline"
+        android:text="@string/btn_sos"
+        android:textSize="28sp" />
+
+</LinearLayout>

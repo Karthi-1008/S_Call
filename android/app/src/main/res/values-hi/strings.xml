@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">सीनियर कॉल</string>
+    <string name="status_ready">✅ कॉल प्राप्त करने के लिए तैयार</string>
+    <string name="status_offline">⚠️ इंटरनेट नहीं है — कृपया वाई-फाई जांचें</string>
+    <string name="status_connecting">🔄 जुड़ रहा है...</string>
+
+    <string name="btn_video">🎥 वीडियो</string>
+    <string name="btn_voice">📞 ऑडियो</string>
+    <string name="btn_sos">🔴 आपातकालीन</string>
+    <string name="btn_more">आगे ⏩</string>
+    <string name="btn_back">पीछे ⏪</string>
+
+    <string name="incoming_call_title">कॉल आ रही है</string>
+    <string name="btn_answer">🟢 उठाएं</string>
+    <string name="btn_decline">🔴 काटें</string>
+    <string name="auto_answer_countdown">%1$s का उत्तर %2$d सेकंड में…</string>
+    <string name="btn_stop_auto_answer">✋ रोकें</string>
+
+    <string name="btn_mute">🔇 म्यूट</string>
+    <string name="btn_unmute">🔊 अनम्यूट</string>
+    <string name="btn_camera_off">📷 कैमरा बंद</string>
+    <string name="btn_camera_on">📷 कैमरा चालू</string>
+    <string name="btn_share_screen">📺 स्क्रीन</string>
+    <string name="btn_stop_share">🛑 बंद करें</string>
+    <string name="btn_end_call">🔴 समाप्त</string>
+    <string name="btn_louder">🔊 आवाज़ बढ़ाएं</string>
+
+    <string name="screen_request_prompt">%1$s आपकी स्क्रीन देखना चाहते हैं।</string>
+    <string name="screen_request_instructions">हाँ, दिखाएं दबाएं — फिर अगले बॉक्स पर START NOW दबाएं।</string>
+    <string name="btn_yes_show">हाँ, दिखाएं</string>
+    <string name="btn_no">नहीं</string>
+    <string name="sharing_banner">📺 %1$s आपकी स्क्रीन देख रहे हैं</string>
+
+    <string name="call_ended">कॉल समाप्त हुई</string>
+    <string name="btn_call_back">🟢 वापस कॉल करें</string>
+    <string name="btn_ok">ठीक है</string>
+</resources>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/senior_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/tvConsentTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Rahul wants to see your screen."
+        android:textColor="@color/senior_text_primary"
+        android:textSize="36sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvConsentDesc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:text="@string/screen_request_instructions"
+        android:textColor="@color/senior_text_secondary"
+        android:textSize="28sp" />
+
+    <Button
+        android:id="@+id/btnConsentYes"
+        style="@style/SeniorButton"
+        android:layout_width="match_parent"
+        android:layout_height="110dp"
+        android:layout_marginTop="48dp"
+        android:background="@drawable/bg_btn_answer"
+        android:text="@string/btn_yes_show"
+        android:textSize="30sp" />
+
+    <Button
+        android:id="@+id/btnConsentNo"
+        style="@style/SeniorButton"
+        android:layout_width="match_parent"
+        android:layout_height="110dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_btn_decline"
+        android:text="@string/btn_no"
+        android:textSize="30sp" />
+
+</LinearLayout>

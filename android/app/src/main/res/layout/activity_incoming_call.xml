@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootIncomingCall"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/senior_bg"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/tvIncomingTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/incoming_call_title"
+        android:textColor="@color/senior_text_secondary"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <!-- Caller Photo -->
+    <ImageView
+        android:id="@+id/imgCallerPhoto"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:layout_marginTop="24dp"
+        android:contentDescription="@string/incoming_call_title"
+        android:scaleType="centerCrop"
+        android:src="@android:drawable/ic_menu_myplaces" />
+
+    <!-- Caller Name (48 sp bold per §8.3 B) -->
+    <TextView
+        android:id="@+id/tvCallerName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:text="RAHUL"
+        android:textColor="@color/senior_text_primary"
+        android:textSize="48sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvCallType"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Video Call"
+        android:textColor="@color/color_blue_video"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <!-- Auto-Answer Countdown Container -->
+    <LinearLayout
+        android:id="@+id/layoutAutoAnswer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvAutoAnswerText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Answering Rahul in 3…"
+            android:textColor="@color/color_green_call"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnStopAutoAnswer"
+            style="@style/SeniorButton"
+            android:layout_width="wrap_content"
+            android:layout_height="80dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_btn_decline"
+            android:text="@string/btn_stop_auto_answer"
+            android:textSize="24sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Bottom Giant Action Buttons: ANSWER & DECLINE (§8.3 B) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnAnswerCall"
+            style="@style/SeniorButton"
+            android:layout_width="0dp"
+            android:layout_height="120dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_answer"
+            android:text="@string/btn_answer"
+            android:textSize="32sp" />
+
+        <Button
+            android:id="@+id/btnDeclineCall"
+            style="@style/SeniorButton"
+            android:layout_width="0dp"
+            android:layout_height="120dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_decline"
+            android:text="@string/btn_decline"
+            android:textSize="32sp" />
+    </LinearLayout>
+
+</LinearLayout>

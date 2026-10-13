@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Family Settings"
+        android:textColor="@color/senior_text_primary"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Enter 4-digit PIN to exit Kiosk mode:"
+        android:textColor="@color/senior_text_secondary"
+        android:textSize="18sp" />
+
+    <EditText
+        android:id="@+id/etPin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:hint="••••"
+        android:inputType="numberPassword"
+        android:letterSpacing="0.4"
+        android:maxLength="4"
+        android:textSize="32sp" />
+
+</LinearLayout>

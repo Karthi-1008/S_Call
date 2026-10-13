@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="12dp"
+    app:cardBackgroundColor="@color/senior_card_bg"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="6dp"
+    app:contentPadding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <!-- Contact Photo / Avatar -->
+        <ImageView
+            android:id="@+id/imgContactPhoto"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:contentDescription="@string/app_name"
+            android:scaleType="centerCrop"
+            android:src="@android:drawable/ic_menu_myplaces" />
+
+        <!-- Contact Name (≥ 36 sp bold per §8.2) -->
+        <TextView
+            android:id="@+id/tvContactName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center"
+            android:text="NAME"
+            android:textColor="@color/senior_text_primary"
+            android:textSize="36sp"
+            android:textStyle="bold" />
+
+        <!-- Two Giant Buttons (§8.3 A) -->
+        <Button
+            android:id="@+id/btnTileVideo"
+            style="@style/SeniorButton"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_btn_video"
+            android:text="@string/btn_video"
+            android:textSize="28sp" />
+
+        <Button
+            android:id="@+id/btnTileVoice"
+            style="@style/SeniorButton"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:background="@drawable/bg_btn_voice"
+            android:text="@string/btn_voice"
+            android:textSize="28sp" />
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

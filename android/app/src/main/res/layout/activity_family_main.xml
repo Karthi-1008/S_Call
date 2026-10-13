@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/senior_bg"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SeniorCall Family"
+        android:textColor="@color/senior_text_primary"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvFamilyElderStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="#DCFCE7"
+        android:padding="12dp"
+        android:text="Elder Status: Online"
+        android:textColor="@color/status_ready"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btnFamilyCallVideo"
+        style="@style/SeniorButton"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_btn_video"
+        android:text="Video Call Elder"
+        android:textSize="22sp" />
+
+    <Button
+        android:id="@+id/btnFamilyCallVoice"
+        style="@style/SeniorButton"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_btn_voice"
+        android:text="Voice Call Elder"
+        android:textSize="22sp" />
+
+    <Button
+        android:id="@+id/btnFamilyRequestScreen"
+        style="@style/SeniorButton"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_btn_share"
+        android:text="Request Elder's Screen"
+        android:textSize="20sp" />
+
+</LinearLayout>

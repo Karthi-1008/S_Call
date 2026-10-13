@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootCallView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/call_bg_dark">
+
+    <!-- Remote Video SurfaceViewRenderer -->
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/remoteSurfaceRenderer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/layoutCallControls"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Remote Screen Share SurfaceViewRenderer (Overlaid when remote is sharing) -->
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/screenSurfaceRenderer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/layoutCallControls"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Local Camera Preview (PIP, fixed top-right corner, non-draggable §8.3 C) -->
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/localSurfaceRenderer"
+        android:layout_width="120dp"
+        android:layout_height="160dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Top Left: Call Info (Name, Timer, Quality Dots §8.3 C) -->
+    <LinearLayout
+        android:id="@+id/layoutCallMeta"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:background="#99000000"
+        android:orientation="vertical"
+        android:padding="8dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tvPeerName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Rahul"
+            android:textColor="@color/white"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvCallDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="@color/white"
+            android:textSize="22sp" />
+
+        <TextView
+            android:id="@+id/tvCallQualityDots"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="●●●●○"
+            android:textColor="#4ADE80"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <!-- Top Center: Louder / Volume Button -->
+    <Button
+        android:id="@+id/btnLouder"
+        style="@style/SeniorButton"
+        android:layout_width="wrap_content"
+        android:layout_height="64dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_btn_neutral"
+        android:text="@string/btn_louder"
+        android:textSize="20sp"
+        app:layout_constraintEnd_toStartOf="@id/localSurfaceRenderer"
+        app:layout_constraintStart_toEndOf="@id/layoutCallMeta"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Persistent Orange Sharing Banner when Elder is Sharing (§8.3 D) -->
+    <LinearLayout
+        android:id="@+id/layoutSharingBanner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@color/color_orange_share"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/layoutCallControls"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/tvSharingBannerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/sharing_banner"
+            android:textColor="@color/white"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnStopSharingBanner"
+            style="@style/SeniorButton"
+            android:layout_width="wrap_content"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_btn_decline"
+            android:text="@string/btn_stop_share"
+            android:textSize="22sp" />
+    </LinearLayout>
+
+    <!-- Call Controls Bar at Bottom (Max 4 buttons, END is 20% wider §8.3 C) -->
+    <LinearLayout
+        android:id="@+id/layoutCallControls"
+        android:layout_width="0dp"
+        android:layout_height="120dp"
+        android:background="#1E293B"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <Button
+            android:id="@+id/btnMute"
+            style="@style/SeniorButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_neutral"
+            android:text="@string/btn_mute"
+            android:textSize="24sp" />
+
+        <Button
+            android:id="@+id/btnToggleCam"
+            style="@style/SeniorButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_video"
+            android:text="@string/btn_camera_off"
+            android:textSize="24sp" />
+
+        <Button
+            android:id="@+id/btnShareScreen"
+            style="@style/SeniorButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_btn_share"
+            android:text="@string/btn_share_screen"
+            android:textSize="24sp" />
+
+        <Button
+            android:id="@+id/btnEndCall"
+            style="@style/SeniorButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.2"
+            android:background="@drawable/bg_btn_decline"
+            android:text="@string/btn_end_call"
+            android:textSize="26sp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme (High contrast light theme for elders) -->
+    <style name="Theme.SeniorCall" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@color/senior_bg</item>
+        <item name="android:textColor">@color/senior_text_primary</item>
+        <item name="colorPrimary">@color/color_green_call</item>
+        <item name="colorPrimaryDark">@color/color_green_call_pressed</item>
+        <item name="colorAccent">@color/color_blue_video</item>
+    </style>
+
+    <!-- In-Call Fullscreen Dark Theme -->
+    <style name="Theme.SeniorCall.Call" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/call_bg_dark</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:keepScreenOn">true</item>
+    </style>
+
+    <!-- Senior Button Base Style (≥ 96dp min touch target, thick border) -->
+    <style name="SeniorButton" parent="Widget.AppCompat.Button">
+        <item name="android:minHeight">96dp</item>
+        <item name="android:minWidth">96dp</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:padding">16dp</item>
+    </style>
+</resources>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SeniorCall — Family Portal</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <span class="logo-icon">📞</span>
+        <h1>SeniorCall <span>Family</span></h1>
+      </div>
+      <div class="user-badge" id="userBadge" style="display: none;">
+        <span class="status-dot"></span>
+        <span id="userName">Family</span>
+        <button id="logoutBtn" class="btn-text">Reset</button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      <!-- 1. Setup / Pairing View -->
+      <section id="setupView" class="card view-section">
+        <h2>Connect with Elder's Phone</h2>
+        <p class="subtitle">Step 1: Enter your name and device</p>
+        <div class="form-group">
+          <label for="deviceNameInput">Your Name / Device</label>
+          <input type="text" id="deviceNameInput" placeholder="e.g. Rahul's Laptop" value="Family">
+        </div>
+        <button id="registerBtn" class="btn btn-primary">Continue</button>
+
+        <div id="pairingStep" style="display: none; margin-top: 2rem;">
+          <p class="subtitle">Step 2: Enter the 6-digit pairing code shown on Elder's phone</p>
+          <div class="pair-code-input">
+            <input type="text" id="pairCodeInput" maxlength="6" placeholder="123456" pattern="\d{6}">
+          </div>
+          <button id="pairBtn" class="btn btn-primary">Link Phone</button>
+        </div>
+      </section>
+
+      <!-- 2. Dashboard View -->
+      <section id="dashboardView" class="view-section" style="display: none;">
+        <div class="elder-card card">
+          <div class="elder-header">
+            <div class="elder-avatar">👴</div>
+            <div class="elder-info">
+              <h2 id="elderNameDisplay">Elder's Phone</h2>
+              <div class="elder-meta">
+                <span id="elderStatusBadge" class="badge badge-offline">Offline</span>
+                <span id="elderBatteryDisplay" class="battery-text">🔋 --%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="call-actions">
+            <button id="callVideoBtn" class="btn btn-call-video">
+              <span class="icon">🎥</span>
+              <span>Video Call</span>
+            </button>
+            <button id="callAudioBtn" class="btn btn-call-audio">
+              <span class="icon">📞</span>
+              <span>Voice Call</span>
+            </button>
+          </div>
+
+          <div class="secondary-actions">
+            <button id="manageContactsBtn" class="btn btn-secondary">
+              <span class="icon">👥</span> Manage Elder's Contacts
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. In-Call View -->
+      <section id="callView" class="view-section call-view" style="display: none;">
+        <div class="video-container" id="videoContainer">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <video id="remoteScreenVideo" autoplay playsinline style="display: none;"></video>
+          <video id="localVideo" autoplay playsinline muted class="pip-video"></video>
+          <div id="callTimer" class="call-timer">00:00</div>
+          <div id="callQualityBadge" class="quality-badge">●●●●○ Good</div>
+          <div id="screenShareBanner" class="screen-share-banner" style="display: none;">
+            📺 Elder can see your screen
+          </div>
+        </div>
+
+        <div class="call-controls">
+          <button id="toggleAudioBtn" class="ctrl-btn" title="Mute Audio">
+            <span class="icon">🎤</span>
+            <span class="label">Mute</span>
+          </button>
+          <button id="toggleVideoBtn" class="ctrl-btn" title="Toggle Camera">
+            <span class="icon">📷</span>
+            <span class="label">Camera</span>
+          </button>
+          <button id="shareScreenBtn" class="ctrl-btn" title="Share Screen">
+            <span class="icon">🖥️</span>
+            <span class="label">Share</span>
+          </button>
+          <button id="endCallBtn" class="ctrl-btn btn-danger" title="End Call">
+            <span class="icon">🔴</span>
+            <span class="label">End</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 4. Incoming Call Modal -->
+      <div id="incomingCallModal" class="modal-backdrop" style="display: none;">
+        <div class="modal card">
+          <div class="modal-avatar pulse">👴</div>
+          <h2 id="incomingCallerName">Elder is calling...</h2>
+          <p id="incomingCallType">Incoming Video Call</p>
+          <div class="modal-actions">
+            <button id="acceptCallBtn" class="btn btn-call-video">🟢 Answer</button>
+            <button id="declineCallBtn" class="btn btn-danger">🔴 Decline</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Remote Contacts Modal -->
+      <div id="contactsModal" class="modal-backdrop" style="display: none;">
+        <div class="modal card modal-wide">
+          <div class="modal-header">
+            <h3>Elder's Contact Tiles</h3>
+            <button id="closeContactsBtn" class="close-btn">&times;</button>
+          </div>
+          <p class="subtitle">Add family members shown on the Elder's screen.</p>
+          <div id="contactsList" class="contacts-list"></div>
+          <div class="contact-form">
+            <h4>Add New Contact</h4>
+            <div class="form-row">
+              <input type="text" id="newContactName" placeholder="Name (e.g. Priya)">
+              <label class="checkbox-label">
+                <input type="checkbox" id="newContactAutoAnswer"> Auto-Answer
+              </label>
+              <button id="addContactBtn" class="btn btn-primary">Add Tile</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

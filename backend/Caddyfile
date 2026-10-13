@@ -1,0 +1,21 @@
+{$DOMAIN:call.example.com} {
+    encode gzip zstd
+
+    handle /ws* {
+        reverse_proxy signaling:8080
+    }
+
+    handle /v1/* {
+        reverse_proxy signaling:8080
+    }
+
+    handle /healthz {
+        reverse_proxy signaling:8080
+    }
+
+    handle {
+        root * /srv/web-client
+        try_files {path} /index.html
+        file_server
+    }
+}

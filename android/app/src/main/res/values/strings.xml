@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SeniorCall</string>
+    <string name="status_ready">✅ Ready to receive calls</string>
+    <string name="status_offline">⚠️ No internet — please check Wi-Fi</string>
+    <string name="status_connecting">🔄 Connecting...</string>
+
+    <!-- Home Actions -->
+    <string name="btn_video">🎥 VIDEO</string>
+    <string name="btn_voice">📞 VOICE</string>
+    <string name="btn_sos">🔴 EMERGENCY</string>
+    <string name="btn_more">MORE ⏩</string>
+    <string name="btn_back">⏪ BACK</string>
+
+    <!-- Incoming Call Screen -->
+    <string name="incoming_call_title">Incoming Call</string>
+    <string name="btn_answer">🟢 ANSWER</string>
+    <string name="btn_decline">🔴 DECLINE</string>
+    <string name="auto_answer_countdown">Answering %1$s in %2$d…</string>
+    <string name="btn_stop_auto_answer">✋ STOP</string>
+
+    <!-- In-Call Controls (Always visible, ≥28sp) -->
+    <string name="btn_mute">🔇 MUTE</string>
+    <string name="btn_unmute">🔊 UNMUTE</string>
+    <string name="btn_camera_off">📷 CAM OFF</string>
+    <string name="btn_camera_on">📷 CAM ON</string>
+    <string name="btn_share_screen">📺 SHARE</string>
+    <string name="btn_stop_share">🛑 STOP</string>
+    <string name="btn_end_call">🔴 END</string>
+    <string name="btn_louder">🔊 LOUDER</string>
+
+    <!-- Screen Sharing & Consent -->
+    <string name="screen_request_prompt">%1$s wants to see your screen.</string>
+    <string name="screen_request_instructions">Press YES, SHOW — then press START NOW on the next box.</string>
+    <string name="btn_yes_show">YES, SHOW</string>
+    <string name="btn_no">NO</string>
+    <string name="sharing_banner">📺 %1$s can see your screen</string>
+
+    <!-- Post-Call -->
+    <string name="call_ended">Call Ended</string>
+    <string name="btn_call_back">🟢 CALL BACK</string>
+    <string name="btn_ok">OK</string>
+
+    <!-- Setup / Pairing Wizard -->
+    <string name="setup_title">SeniorCall Setup</string>
+    <string name="setup_senior_mode">Elder Phone (Senior Mode)</string>
+    <string name="setup_family_mode">Family Phone / Tablet</string>
+    <string name="pairing_code_label">Pairing Code</string>
+    <string name="pairing_instructions">Scan this QR or enter the 6-digit code on the family phone.</string>
+</resources>

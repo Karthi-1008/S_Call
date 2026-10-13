@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/senior_bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/setup_title"
+            android:textColor="@color/senior_text_primary"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Choose how this phone will be used:"
+            android:textColor="@color/senior_text_secondary"
+            android:textSize="20sp" />
+
+        <!-- Role Selection -->
+        <RadioGroup
+            android:id="@+id/rgRole"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <RadioButton
+                android:id="@+id/rbRoleSenior"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:checked="true"
+                android:text="@string/setup_senior_mode"
+                android:textSize="22sp" />
+
+            <RadioButton
+                android:id="@+id/rbRoleFamily"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:text="@string/setup_family_mode"
+                android:textSize="22sp" />
+        </RadioGroup>
+
+        <!-- Server URL Setting -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Signaling Server URL:"
+            android:textColor="@color/senior_text_secondary"
+            android:textSize="18sp" />
+
+        <EditText
+            android:id="@+id/etServerUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:hint="http://10.0.2.2:8080"
+            android:inputType="textUri"
+            android:padding="12dp"
+            android:textSize="18sp" />
+
+        <!-- Permissions Section -->
+        <Button
+            android:id="@+id/btnGrantPermissions"
+            style="@style/SeniorButton"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_btn_neutral"
+            android:text="Grant Permissions (Camera/Mic)"
+            android:textSize="20sp" />
+
+        <!-- Pairing Section -->
+        <LinearLayout
+            android:id="@+id/layoutPairing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pairing_code_label"
+                android:textColor="@color/senior_text_secondary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPairingCode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="------"
+                android:textColor="@color/color_blue_video"
+                android:textSize="48sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/imgPairingQr"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:layout_marginTop="16dp"
+                android:contentDescription="QR Code" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="@string/pairing_instructions"
+                android:textColor="@color/senior_text_secondary"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnFinishSetup"
+            style="@style/SeniorButton"
+            android:layout_width="match_parent"
+            android:layout_height="96dp"
+            android:layout_marginTop="32dp"
+            android:background="@drawable/bg_btn_answer"
+            android:text="Complete Setup"
+            android:textSize="24sp" />
+
+    </LinearLayout>
+</ScrollView>

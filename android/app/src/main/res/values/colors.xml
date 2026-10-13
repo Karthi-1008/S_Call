@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AAA High-Contrast Palette (§8.2) -->
+    <color name="senior_bg">#F8FAFC</color>
+    <color name="senior_card_bg">#FFFFFF</color>
+    <color name="senior_card_border">#CBD5E1</color>
+    <color name="senior_text_primary">#0F172A</color>
+    <color name="senior_text_secondary">#475569</color>
+
+    <!-- Semantic Action Colors (Identical everywhere) -->
+    <color name="color_green_call">#16A34A</color>
+    <color name="color_green_call_pressed">#15803D</color>
+    <color name="color_red_end">#DC2626</color>
+    <color name="color_red_end_pressed">#B91C1C</color>
+    <color name="color_blue_video">#2563EB</color>
+    <color name="color_blue_video_pressed">#1D4ED8</color>
+    <color name="color_orange_share">#EA580C</color>
+    <color name="color_orange_share_pressed">#C2410C</color>
+
+    <color name="status_ready">#16A34A</color>
+    <color name="status_offline">#DC2626</color>
+    <color name="call_bg_dark">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

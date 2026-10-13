@@ -24,7 +24,7 @@ class FamilyMainActivity : AppCompatActivity(), SignalingClient.Listener {
         prefs = Prefs(this)
 
         val elderId = prefs.pairedPeerId ?: "usr_elder"
-        binding.tvPairedInfo.text = "Paired with: Elder ($elderId) • ${if (prefs.isLanMode) "Local Wi-Fi" else "Server Mode"}"
+        binding.tvPairedInfo.text = "Paired with: Elder ($elderId)"
 
         binding.btnFamilyCallVideo.setOnClickListener {
             if (prefs.pairedPeerId.isNullOrEmpty()) {

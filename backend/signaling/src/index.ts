@@ -17,6 +17,7 @@ import {
   registerSocket,
   unregisterSocket,
   getSocket,
+  isUserOnline,
   updateHeartbeat,
   broadcastPresence,
 } from './presence.js';
@@ -24,10 +25,15 @@ import {
   createCall,
   getCall,
   getActiveCallForUser,
+  setCallWaking,
   setCallRinging,
   setCallConnecting,
   setCallConnected,
   endCall,
+  handleSignalingLoss,
+  handleSignalingResume,
+  queueForOfflineUser,
+  drainOutbox,
 } from './calls.js';
 import { generateTurnCredentials } from './turn.js';
 import {
@@ -55,7 +61,7 @@ export function createSignalingServer() {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Device-Id');
 
     if (method === 'OPTIONS') {
       res.writeHead(204);
@@ -270,8 +276,9 @@ export function createSignalingServer() {
       return;
     }
 
-    const token = (query.token as string) || '';
-    const verified = verifyToken(token);
+    const authHeader = request.headers.authorization;
+    const token = (query.token as string) || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : '');
+    const verified = token ? verifyToken(token) : null;
 
     if (!verified) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -279,19 +286,23 @@ export function createSignalingServer() {
       return;
     }
 
+    const deviceId = (query.deviceId as string) || (request.headers['x-device-id'] as string) || 'default';
+
     wss.handleUpgrade(request, socket, head, ws => {
-      wss.emit('connection', ws, request, verified);
+      wss.emit('connection', ws, request, { ...verified, deviceId });
     });
   });
 
   wss.on('connection', (ws: WebSocket, _request: http.IncomingMessage, userPayload: any) => {
     const userId = userPayload.userId;
     const role = userPayload.role;
+    const deviceId = userPayload.deviceId || 'default';
     const user = getUser(userId);
 
-    registerSocket(userId, role, ws);
+    registerSocket(userId, deviceId, role, ws);
+    handleSignalingResume(userId);
 
-    // Send 'hello' message immediately (§13.2)
+    // Send 'hello' message immediately (§13.2 / §3.6)
     const turn = generateTurnCredentials(userId, TURN_SECRET, TURN_DOMAIN, STUN_PORT, TURNS_PORT);
     const contacts = getContacts(userId);
     const helloMsg: HelloMessage = {
@@ -300,8 +311,15 @@ export function createSignalingServer() {
       contacts,
       serverTime: Date.now(),
       userId,
+      deviceId,
     };
     ws.send(JSON.stringify(helloMsg));
+
+    // Drain outbox if any messages queued for this user
+    const pendingMessages = drainOutbox(userId);
+    for (const msg of pendingMessages) {
+      ws.send(JSON.stringify(msg));
+    }
 
     // Broadcast presence online to paired users
     if (user) {
@@ -311,7 +329,7 @@ export function createSignalingServer() {
     ws.on('message', (rawData: string) => {
       try {
         const msg = JSON.parse(rawData.toString()) as SignalingMessage;
-        handleSignalingMessage(userId, ws, msg);
+        handleSignalingMessage(userId, deviceId, ws, msg);
       } catch (err) {
         console.error('[WS] Parse error:', err);
         const errReply: ErrorMessage = {
@@ -324,44 +342,69 @@ export function createSignalingServer() {
     });
 
     ws.on('close', () => {
-      // Check if user has an active call
+      // S3: Signaling loss grace period (60s). Do NOT kill media prematurely on socket close!
       const activeCall = getActiveCallForUser(userId);
-      if (activeCall) {
-        endCall(activeCall.callId, 'peer_disconnected');
+      if (activeCall && activeCall.state !== 'ENDED') {
         const peerId = activeCall.callerId === userId ? activeCall.calleeId : activeCall.callerId;
         const peerSocket = getSocket(peerId);
         if (peerSocket && peerSocket.readyState === WebSocket.OPEN) {
-          const endMsg: CallEndMessage = {
-            t: 'call_end',
+          peerSocket.send(JSON.stringify({
+            t: 'peer_signaling_lost',
             callId: activeCall.callId,
-            reason: 'disconnected',
-          };
-          peerSocket.send(JSON.stringify(endMsg));
+          }));
         }
+
+        handleSignalingLoss(userId, (expiredCall) => {
+          const pSocket = getSocket(peerId);
+          if (pSocket && pSocket.readyState === WebSocket.OPEN) {
+            const endMsg: CallEndMessage = {
+              t: 'call_end',
+              callId: expiredCall.callId,
+              reason: 'signaling_timeout',
+            };
+            pSocket.send(JSON.stringify(endMsg));
+          }
+        });
       }
 
-      unregisterSocket(userId);
-      if (user) {
+      unregisterSocket(userId, deviceId, ws);
+      if (user && !isUserOnline(userId)) {
         broadcastPresence(userId, false, Array.from(user.pairedUsers));
       }
     });
   });
 
-  function handleSignalingMessage(fromUserId: string, ws: WebSocket, msg: any) {
+  function handleSignalingMessage(fromUserId: string, deviceId: string, ws: WebSocket, msg: any) {
+    const user = getUser(fromUserId);
+
     switch (msg.t) {
       case 'ping': {
-        updateHeartbeat(fromUserId, msg.battery);
+        updateHeartbeat(fromUserId, deviceId, msg.battery);
         ws.send(JSON.stringify({ t: 'pong', serverTime: Date.now() }));
         break;
       }
 
       case 'pong': {
-        updateHeartbeat(fromUserId, msg.battery);
+        updateHeartbeat(fromUserId, deviceId, msg.battery);
+        break;
+      }
+
+      case 'resume': {
+        handleSignalingResume(fromUserId);
+        const pending = drainOutbox(fromUserId);
+        for (const p of pending) {
+          ws.send(JSON.stringify(p));
+        }
+        break;
+      }
+
+      case 'ack': {
+        // Acknowledged up to msg.upTo
         break;
       }
 
       case 'call_invite': {
-        const { to, media } = msg;
+        const { to, media, sdp } = msg;
         if (!to) {
           ws.send(JSON.stringify({ t: 'error', code: 'INVALID_TARGET', message: 'Target user ID required' }));
           return;
@@ -384,20 +427,8 @@ export function createSignalingServer() {
           return;
         }
 
-        // Check if callee is connected
-        const targetSocket = getSocket(to);
-        if (!targetSocket || targetSocket.readyState !== WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            t: 'error',
-            code: 'CALLEE_OFFLINE',
-            message: 'User is not currently online',
-          }));
-          return;
-        }
-
         const caller = getUser(fromUserId);
         const call = createCall(fromUserId, to, media || 'video', (timedOutCall, reason) => {
-          // Timeout callback
           const callerWs = getSocket(timedOutCall.callerId);
           if (callerWs && callerWs.readyState === WebSocket.OPEN) {
             callerWs.send(JSON.stringify({
@@ -416,8 +447,7 @@ export function createSignalingServer() {
           }
         });
 
-        // Forward invite to callee
-        targetSocket.send(JSON.stringify({
+        const invitePayload = {
           t: 'call_invite',
           callId: call.callId,
           from: fromUserId,
@@ -425,13 +455,27 @@ export function createSignalingServer() {
           media: call.media,
           callerName: caller?.deviceName || 'Family Member',
           autoAnswerAllowed: !!msg.autoAnswerAllowed,
-        }));
+          sdp: sdp, // Offer-in-Invite (§3.6)
+        };
 
-        // Notify caller that invite was dispatched
-        ws.send(JSON.stringify({
-          t: 'call_ringing',
-          callId: call.callId,
-        }));
+        const targetSocket = getSocket(to);
+        if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
+          targetSocket.send(JSON.stringify(invitePayload));
+          // Notify caller of ringing
+          ws.send(JSON.stringify({
+            t: 'call_ringing',
+            callId: call.callId,
+          }));
+        } else {
+          // S4: Callee offline or reconnecting, queue in outbox for 45s
+          queueForOfflineUser(to, invitePayload, 45_000);
+          setCallWaking(call.callId);
+          ws.send(JSON.stringify({
+            t: 'call_state',
+            callId: call.callId,
+            state: 'waking',
+          }));
+        }
         break;
       }
 
@@ -458,7 +502,7 @@ export function createSignalingServer() {
           });
           const callerSocket = getSocket(call.callerId);
           if (callerSocket && callerSocket.readyState === WebSocket.OPEN) {
-            callerSocket.send(JSON.stringify(msg));
+            callerSocket.send(JSON.stringify(msg)); // Forwards call_accept with answer sdp
           }
         }
         break;
@@ -476,6 +520,19 @@ export function createSignalingServer() {
         break;
       }
 
+      case 'call_connected': {
+        const call = getCall(msg.callId);
+        if (call) {
+          setCallConnected(call.callId);
+          const peerId = call.callerId === fromUserId ? call.calleeId : call.callerId;
+          const peerSocket = getSocket(peerId);
+          if (peerSocket && peerSocket.readyState === WebSocket.OPEN) {
+            peerSocket.send(JSON.stringify(msg));
+          }
+        }
+        break;
+      }
+
       case 'offer':
       case 'answer': {
         const call = getCall(msg.callId);
@@ -487,6 +544,18 @@ export function createSignalingServer() {
           const peerSocket = getSocket(peerId);
           if (peerSocket && peerSocket.readyState === WebSocket.OPEN) {
             peerSocket.send(JSON.stringify(msg));
+          }
+        }
+        break;
+      }
+
+      case 'ice_restart_request': {
+        const call = getCall(msg.callId);
+        if (call) {
+          // Caller generates the offer on ICE restart (§6.2)
+          const callerSocket = getSocket(call.callerId);
+          if (callerSocket && callerSocket.readyState === WebSocket.OPEN) {
+            callerSocket.send(JSON.stringify(msg));
           }
         }
         break;
@@ -542,7 +611,7 @@ const isMainModule = () => {
   try {
     const currentFile = fileURLToPath(import.meta.url);
     return process.argv[1] === currentFile ||
-           process.argv[1].endsWith('index.js') && !process.argv[1].includes('test');
+           (process.argv[1].endsWith('index.js') && !process.argv[1].includes('test'));
   } catch {
     return false;
   }
@@ -554,4 +623,3 @@ if (isMainModule() && process.env.NODE_ENV !== 'test') {
     console.log(`[SeniorCall] Signaling Server listening on port ${PORT}`);
   });
 }
-

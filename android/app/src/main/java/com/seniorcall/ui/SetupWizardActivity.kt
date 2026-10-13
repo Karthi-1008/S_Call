@@ -9,8 +9,11 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -24,16 +27,27 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.seniorcall.App
 import com.seniorcall.R
 import com.seniorcall.core.Prefs
+import com.seniorcall.data.Contact
 import com.seniorcall.databinding.ActivitySetupWizardBinding
-import com.seniorcall.signaling.MqttSignalingClient
-import com.seniorcall.signaling.SignalingClient
-import kotlin.random.Random
+import com.seniorcall.signaling.*
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
-class SetupWizardActivity : AppCompatActivity() {
+class SetupWizardActivity : AppCompatActivity(), SignalingClient.Listener {
+    private val tag = "SetupWizard"
     private lateinit var binding: ActivitySetupWizardBinding
     private lateinit var prefs: Prefs
     private val gson = Gson()
-    private var testSignalingClient: MqttSignalingClient? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var signalingClient: SignalingClient? = null
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
 
     private val qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
@@ -49,7 +63,6 @@ class SetupWizardActivity : AppCompatActivity() {
         prefs = Prefs(this)
 
         setupRoleSelection()
-        setupSeniorMode()
         setupFamilyMode()
 
         binding.btnGrantPermissions.setOnClickListener {
@@ -78,41 +91,52 @@ class SetupWizardActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupSeniorMode() {
-        refreshSeniorQr()
-    }
-
     private fun refreshSeniorQr() {
-        val key = if (prefs.pairKey.isNotEmpty()) prefs.pairKey else "SC-" + String.format("%06d", Random.nextInt(100000, 999999))
-        prefs.pairKey = key
-        prefs.userId = "usr_elder"
         prefs.role = "senior"
+        binding.tvSeniorStatus.text = "⏳ Generating Secure Pairing Code..."
+        binding.tvSeniorStatus.setBackgroundColor(Color.parseColor("#FEF3C7"))
+        binding.tvSeniorStatus.setTextColor(Color.parseColor("#D97706"))
 
-        binding.tvSeniorPairCode.text = key
+        // Register elder if needed, then request pair code
+        Thread {
+            try {
+                ensureRegistered("senior", "Elder Phone") { token, userId ->
+                    requestPairCode(token) { code ->
+                        mainHandler.post {
+                            binding.tvSeniorPairCode.text = code
+                            binding.tvSeniorStatus.text = "🟢 Ready to Pair. Point Family camera at QR code."
+                            binding.tvSeniorStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
+                            binding.tvSeniorStatus.setTextColor(Color.parseColor("#16A34A"))
 
-        // Generate clean QR code
-        val qrPayload = gson.toJson(
-            mapOf(
-                "type" to "seniorcall",
-                "key" to key,
-                "role" to "elder"
-            )
-        )
-        generateQrCode(qrPayload)
+                            // Generate QR Payload
+                            val qrMap = mapOf(
+                                "serverUrl" to prefs.serverUrl,
+                                "code" to code,
+                                "elderId" to userId
+                            )
+                            val qrPayload = gson.toJson(qrMap)
+                            generateQrCode(qrPayload)
 
-        // Connect temporary client to acknowledge when family pairs
-        testSignalingClient?.disconnect()
-        testSignalingClient = MqttSignalingClient(key, "senior", object : SignalingClient.Listener {
-            override fun onPresence(presence: com.seniorcall.signaling.PresenceMessage) {
-                if (presence.online) {
-                    runOnUiThread {
-                        binding.tvSeniorStatus.text = "🟢 Family Phone Connected & Paired!"
-                        binding.tvSeniorStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
-                        binding.tvSeniorStatus.setTextColor(Color.parseColor("#16A34A"))
+                            // Connect signaling to detect live pairing event
+                            listenForPairingSuccess(token)
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to prepare senior QR", e)
+                mainHandler.post {
+                    binding.tvSeniorStatus.text = "⚠️ Network error. Check Wi-Fi connection."
+                    binding.tvSeniorStatus.setBackgroundColor(Color.parseColor("#FEE2E2"))
+                    binding.tvSeniorStatus.setTextColor(Color.parseColor("#DC2626"))
+                }
             }
-        }).apply { connect() }
+        }.start()
+    }
+
+    private fun listenForPairingSuccess(token: String) {
+        signalingClient?.disconnect()
+        signalingClient = SignalingClient(prefs.wsUrl, token, prefs.deviceId, this)
+        signalingClient?.connect()
     }
 
     private fun setupFamilyMode() {
@@ -125,50 +149,128 @@ class SetupWizardActivity : AppCompatActivity() {
             qrScanLauncher.launch(options)
         }
 
-        binding.btnFamilyPairManual.setOnClickListener {
-            val code = binding.etFamilyPairCode.text.toString().trim()
-            if (code.isNotEmpty()) {
-                applyFamilyPairing(code)
-            } else {
-                Toast.makeText(this, "Please enter a pair code", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        if (prefs.pairKey.isNotEmpty() && prefs.role == "family") {
-            binding.tvFamilyPairStatus.text = "✅ Already Paired (Code: ${prefs.pairKey})"
+        if (prefs.pairedPeerId != null && prefs.role == "family") {
+            binding.tvFamilyPairStatus.text = "✅ Already Paired with Elder (${prefs.pairedPeerId})"
             binding.tvFamilyPairStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
             binding.tvFamilyPairStatus.setTextColor(Color.parseColor("#16A34A"))
         }
     }
 
     private fun handleScannedQr(contents: String) {
-        val extractedKey = try {
+        try {
             val map = gson.fromJson(contents, Map::class.java)
-            map["key"]?.toString() ?: contents
-        } catch (e: Exception) {
-            contents
-        }
+            val serverUrl = map["serverUrl"]?.toString() ?: prefs.serverUrl
+            val code = map["code"]?.toString() ?: ""
+            val elderId = map["elderId"]?.toString() ?: ""
 
-        val cleanKey = extractedKey.trim()
-        binding.etFamilyPairCode.setText(cleanKey)
-        applyFamilyPairing(cleanKey)
+            if (code.isEmpty()) {
+                Toast.makeText(this, "Invalid SeniorCall QR Code", Toast.LENGTH_LONG).show()
+                return
+            }
+
+            if (serverUrl.isNotEmpty()) {
+                prefs.serverUrl = serverUrl
+            }
+
+            binding.tvFamilyPairStatus.text = "⏳ Confirming Pairing with Elder..."
+            binding.tvFamilyPairStatus.setBackgroundColor(Color.parseColor("#FEF3C7"))
+            binding.tvFamilyPairStatus.setTextColor(Color.parseColor("#D97706"))
+
+            // Perform registration & pair confirmation
+            Thread {
+                try {
+                    ensureRegistered("family", "Family Phone") { token, userId ->
+                        confirmPairingWithServer(token, code) { confirmedElderId ->
+                            mainHandler.post {
+                                prefs.role = "family"
+                                prefs.pairedPeerId = confirmedElderId.ifEmpty { elderId }
+                                binding.tvFamilyPairStatus.text = "✅ Successfully Paired with Elder Phone!"
+                                binding.tvFamilyPairStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
+                                binding.tvFamilyPairStatus.setTextColor(Color.parseColor("#16A34A"))
+                                Toast.makeText(this@SetupWizardActivity, "Paired! Tap Complete Setup.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Pair confirmation failed", e)
+                    mainHandler.post {
+                        binding.tvFamilyPairStatus.text = "❌ Pairing Failed: ${e.message}"
+                        binding.tvFamilyPairStatus.setBackgroundColor(Color.parseColor("#FEE2E2"))
+                        binding.tvFamilyPairStatus.setTextColor(Color.parseColor("#DC2626"))
+                    }
+                }
+            }.start()
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to parse QR code", e)
+            Toast.makeText(this, "Invalid QR Code format", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun applyFamilyPairing(key: String) {
-        prefs.pairKey = key
-        prefs.pairedPeerId = "usr_elder"
-        prefs.userId = "usr_family"
-        prefs.role = "family"
+    private fun ensureRegistered(role: String, deviceName: String, onRegistered: (token: String, userId: String) -> Unit) {
+        val existingToken = prefs.token
+        val existingUserId = prefs.userId
 
-        binding.tvFamilyPairStatus.text = "✅ Successfully Paired with Elder Phone ($key)"
-        binding.tvFamilyPairStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
-        binding.tvFamilyPairStatus.setTextColor(Color.parseColor("#16A34A"))
+        if (!existingToken.isNullOrEmpty() && !existingUserId.isNullOrEmpty()) {
+            onRegistered(existingToken, existingUserId)
+            return
+        }
 
-        Toast.makeText(this, "Paired with Elder! You can now complete setup.", Toast.LENGTH_LONG).show()
+        val url = "${prefs.serverUrl}/v1/register"
+        val json = gson.toJson(mapOf("role" to role, "deviceName" to deviceName))
+        val body = json.toRequestBody("application/json".toMediaType())
+        val req = Request.Builder().url(url).post(body).build()
 
-        // Notify elder immediately over MQTT
-        testSignalingClient?.disconnect()
-        testSignalingClient = MqttSignalingClient(key, "family").apply { connect() }
+        val resp = httpClient.newCall(req).execute()
+        if (!resp.isSuccessful) {
+            throw IOException("Registration failed with HTTP ${resp.code}")
+        }
+        val resBody = resp.body?.string() ?: ""
+        val data = gson.fromJson(resBody, Map::class.java)
+        val token = data["jwt"]?.toString() ?: throw IOException("Missing jwt in register response")
+        val userId = data["userId"]?.toString() ?: throw IOException("Missing userId in register response")
+
+        prefs.token = token
+        prefs.userId = userId
+        prefs.role = role
+        onRegistered(token, userId)
+    }
+
+    private fun requestPairCode(token: String, onCodeReady: (code: String) -> Unit) {
+        val url = "${prefs.serverUrl}/v1/pair/start"
+        val req = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $token")
+            .post("{}".toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = httpClient.newCall(req).execute()
+        if (!resp.isSuccessful) {
+            throw IOException("Pair start failed with HTTP ${resp.code}")
+        }
+        val resBody = resp.body?.string() ?: ""
+        val data = gson.fromJson(resBody, Map::class.java)
+        val code = data["code"]?.toString() ?: throw IOException("Missing code in pair/start response")
+        prefs.pairingCode = code
+        onCodeReady(code)
+    }
+
+    private fun confirmPairingWithServer(token: String, code: String, onSuccess: (elderId: String) -> Unit) {
+        val url = "${prefs.serverUrl}/v1/pair/confirm"
+        val json = gson.toJson(mapOf("code" to code))
+        val req = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $token")
+            .post(json.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val resp = httpClient.newCall(req).execute()
+        if (!resp.isSuccessful) {
+            throw IOException("Pair confirm failed with HTTP ${resp.code}")
+        }
+        val resBody = resp.body?.string() ?: ""
+        val data = gson.fromJson(resBody, Map::class.java)
+        val elderId = data["elderId"]?.toString() ?: ""
+        onSuccess(elderId)
     }
 
     private fun generateQrCode(content: String) {
@@ -177,7 +279,28 @@ class SetupWizardActivity : AppCompatActivity() {
             val bitmap: Bitmap = barcodeEncoder.encodeBitmap(content, BarcodeFormat.QR_CODE, 450, 450)
             binding.imgSeniorQr.setImageBitmap(bitmap)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(tag, "Failed to render QR bitmap", e)
+        }
+    }
+
+    // Signaling Listener Callbacks
+    override fun onContactsUpdate(contacts: List<Contact>) {
+        if (contacts.isNotEmpty()) {
+            runOnUiThread {
+                binding.tvSeniorStatus.text = "🟢 Family Phone Connected & Paired!"
+                binding.tvSeniorStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
+                binding.tvSeniorStatus.setTextColor(Color.parseColor("#16A34A"))
+            }
+        }
+    }
+
+    override fun onPresence(presence: PresenceMessage) {
+        if (presence.online) {
+            runOnUiThread {
+                binding.tvSeniorStatus.text = "🟢 Family Phone Connected & Paired!"
+                binding.tvSeniorStatus.setBackgroundColor(Color.parseColor("#DCFCE7"))
+                binding.tvSeniorStatus.setTextColor(Color.parseColor("#16A34A"))
+            }
         }
     }
 
@@ -217,18 +340,13 @@ class SetupWizardActivity : AppCompatActivity() {
         val isSenior = binding.rbRoleSenior.isChecked
         prefs.role = if (isSenior) "senior" else "family"
 
-        if (!isSenior && prefs.pairKey.isEmpty()) {
-            val manualCode = binding.etFamilyPairCode.text.toString().trim()
-            if (manualCode.isNotEmpty()) {
-                applyFamilyPairing(manualCode)
-            } else {
-                Toast.makeText(this, "Please scan Elder's QR code before completing setup", Toast.LENGTH_LONG).show()
-                return
-            }
+        if (!isSenior && prefs.pairedPeerId.isNullOrEmpty()) {
+            Toast.makeText(this, "Please scan Elder's QR code before completing setup", Toast.LENGTH_LONG).show()
+            return
         }
 
-        testSignalingClient?.disconnect()
-        testSignalingClient = null
+        signalingClient?.disconnect()
+        signalingClient = null
 
         prefs.isSetupComplete = true
         (application as App).startCallServiceIfConfigured()
@@ -242,7 +360,7 @@ class SetupWizardActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        testSignalingClient?.disconnect()
+        signalingClient?.disconnect()
         super.onDestroy()
     }
 }

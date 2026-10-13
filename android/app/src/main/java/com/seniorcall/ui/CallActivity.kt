@@ -34,6 +34,10 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
         private const val TAG = "CallActivity"
         private const val REQUEST_MEDIA_PROJECTION = 1001
         private const val REQUEST_CONSENT_ACTIVITY = 1002
+
+        private const val ICE_RESTART_CHECK_MS = 8_000L   // 8s check (§6)
+        private const val CONNECT_TIMEOUT_MS = 25_000L      // 25s timeout (§6)
+        private const val DISCONNECTED_RESTART_MS = 5_000L // 5s restart on disconnect (§6)
     }
 
     private lateinit var binding: ActivityCallBinding
@@ -48,6 +52,7 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     private var isMuted = false
     private var isCameraOff = false
     private var isSharingScreen = false
+    private var isMediaConnected = false
 
     private var callSession: CallSession? = null
     private var screenShare: ScreenShare? = null
@@ -55,10 +60,33 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
 
     private var callStartTime = 0L
     private val handler = Handler(Looper.getMainLooper())
+
     private val timerRunnable = object : Runnable {
         override fun run() {
             updateDurationTimer()
             handler.postDelayed(this, 1000)
+        }
+    }
+
+    private val iceRestartCheckRunnable = Runnable {
+        if (!isMediaConnected) {
+            Log.w(TAG, "8s connection check failed: media not connected yet. Triggering ICE restart.")
+            triggerIceRestart()
+        }
+    }
+
+    private val connectTimeoutRunnable = Runnable {
+        if (!isMediaConnected) {
+            Log.e(TAG, "25s connection timeout reached. Ending call.")
+            Toast.makeText(this@CallActivity, "Connection timed out", Toast.LENGTH_SHORT).show()
+            endCall("connect_timeout")
+        }
+    }
+
+    private val disconnectedRestartRunnable = Runnable {
+        if (!isMediaConnected) {
+            Log.w(TAG, "Still disconnected after 5s. Triggering ICE restart.")
+            triggerIceRestart()
         }
     }
 
@@ -161,27 +189,20 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
             localSink = binding.localSurfaceRenderer
         )
 
+        // Offer-in-Invite (§3.6)
         if (!isIncoming) {
             binding.tvCallDuration.text = getString(R.string.status_calling)
-            // Outgoing call invite
-            val myRole = service.prefs.role
-            val myName = if (myRole == "senior") "Elder Phone" else "Family Member"
-            val myId = service.prefs.userId ?: if (myRole == "senior") "usr_elder" else "usr_family"
-
-            service.signalingClient?.send(
-                CallInviteMessage(
-                    callId = callId,
-                    to = targetUserId,
-                    from = myId,
-                    media = mediaType,
-                    callerName = myName
-                )
-            )
+            // Caller generates offer immediately so it can be embedded in call_invite
+            callSession?.createOffer()
         } else {
-            // Incoming call answered, callee notifies acceptance
-            service.signalingClient?.send(CallAcceptMessage(callId = callId))
             binding.tvCallDuration.text = "Connecting..."
+            val offerSdp = intent.getStringExtra("offerSdp") ?: service.currentInvite?.sdp
+            if (!offerSdp.isNullOrEmpty()) {
+                callSession?.setRemoteDescriptionAndAnswer(offerSdp)
+            }
         }
+
+        startConnectingTimers()
 
         // Start quality monitor
         callSession?.peerConnection?.let { pc ->
@@ -195,6 +216,33 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
                     binding.localSurfaceRenderer.visibility = View.GONE
                 }
             }).apply { start() }
+        }
+    }
+
+    private fun startConnectingTimers() {
+        handler.removeCallbacks(iceRestartCheckRunnable)
+        handler.removeCallbacks(connectTimeoutRunnable)
+        handler.postDelayed(iceRestartCheckRunnable, ICE_RESTART_CHECK_MS)
+        handler.postDelayed(connectTimeoutRunnable, CONNECT_TIMEOUT_MS)
+    }
+
+    private fun cancelConnectingTimers() {
+        handler.removeCallbacks(iceRestartCheckRunnable)
+        handler.removeCallbacks(connectTimeoutRunnable)
+        handler.removeCallbacks(disconnectedRestartRunnable)
+    }
+
+    private fun triggerIceRestart() {
+        if (!isIncoming) {
+            // Caller owns ICE restart (§6.2)
+            Log.d(TAG, "Caller triggering ICE restart...")
+            callSession?.restartIce()
+        } else {
+            // Callee requests caller to restart ICE (§6.2)
+            Log.d(TAG, "Callee sending ice_restart_request to caller...")
+            CallService.instance?.signalingClient?.send(
+                IceRestartRequestMessage(callId = callId)
+            )
         }
     }
 
@@ -213,11 +261,43 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
             }
 
             override fun onLocalDescription(sdp: SessionDescription) {
-                val type = if (sdp.type == SessionDescription.Type.OFFER) "offer" else "answer"
-                Log.d(TAG, "Sending local SDP description: $type")
-                CallService.instance?.signalingClient?.send(
-                    SdpMessage(t = type, callId = callId, sdp = sdp.description)
-                )
+                val service = CallService.instance ?: return
+                if (sdp.type == SessionDescription.Type.OFFER) {
+                    if (!isIncoming) {
+                        // First offer: embed in CallInviteMessage (§3.6)
+                        val myRole = service.prefs.role
+                        val myName = if (myRole == "senior") "Elder Phone" else "Family Member"
+                        val myId = service.prefs.userId ?: if (myRole == "senior") "usr_elder" else "usr_family"
+                        Log.d(TAG, "Sending CallInviteMessage with embedded Offer SDP")
+                        service.signalingClient?.send(
+                            CallInviteMessage(
+                                callId = callId,
+                                to = targetUserId,
+                                from = myId,
+                                media = mediaType,
+                                callerName = myName,
+                                sdp = sdp.description
+                            )
+                        )
+                    } else {
+                        // ICE restart offer
+                        service.signalingClient?.send(
+                            SdpMessage(t = "offer", callId = callId, sdp = sdp.description)
+                        )
+                    }
+                } else {
+                    // Answer SDP: embed in CallAcceptMessage (§3.6)
+                    if (isIncoming) {
+                        Log.d(TAG, "Sending CallAcceptMessage with embedded Answer SDP")
+                        service.signalingClient?.send(
+                            CallAcceptMessage(callId = callId, sdp = sdp.description)
+                        )
+                    } else {
+                        service.signalingClient?.send(
+                            SdpMessage(t = "answer", callId = callId, sdp = sdp.description)
+                        )
+                    }
+                }
             }
 
             override fun onRemoteVideoTrack(track: VideoTrack) {
@@ -241,9 +321,18 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
                 Log.d(TAG, "WebRTC connection state: $state")
                 runOnUiThread {
                     if (state == PeerConnection.PeerConnectionState.CONNECTED) {
+                        isMediaConnected = true
+                        cancelConnectingTimers()
                         startTimer()
+                        CallService.instance?.signalingClient?.send(
+                            CallConnectedMessage(callId = callId)
+                        )
                     } else if (state == PeerConnection.PeerConnectionState.FAILED) {
-                        callSession?.restartIce()
+                        isMediaConnected = false
+                        triggerIceRestart()
+                    } else if (state == PeerConnection.PeerConnectionState.DISCONNECTED) {
+                        isMediaConnected = false
+                        handler.postDelayed(disconnectedRestartRunnable, DISCONNECTED_RESTART_MS)
                     }
                 }
             }
@@ -251,12 +340,55 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     }
 
     // SignalingClient.Listener Callbacks
+    override fun onCallState(state: CallStateMessage) {
+        if (state.callId == callId || state.callId.isEmpty()) {
+            runOnUiThread {
+                if (state.state == "waking") {
+                    binding.tvCallDuration.text = "Waking device..."
+                } else if (state.state == "ringing") {
+                    binding.tvCallDuration.text = getString(R.string.status_calling)
+                }
+            }
+        }
+    }
+
+    override fun onCallRinging(ringing: CallRingingMessage) {
+        if (ringing.callId == callId || ringing.callId.isEmpty()) {
+            runOnUiThread {
+                binding.tvCallDuration.text = getString(R.string.status_calling)
+            }
+        }
+    }
+
     override fun onCallAccept(accept: CallAcceptMessage) {
         if (accept.callId == callId || accept.callId.isEmpty()) {
-            Log.d(TAG, "Callee accepted call. Creating SDP offer...")
+            Log.d(TAG, "Callee accepted call. Setting remote answer...")
             runOnUiThread {
-                startTimer()
-                callSession?.createOffer()
+                if (!accept.sdp.isNullOrEmpty()) {
+                    callSession?.setRemoteAnswer(accept.sdp)
+                }
+            }
+        }
+    }
+
+    override fun onIceRestartRequest(msg: IceRestartRequestMessage) {
+        if (msg.callId == callId || msg.callId.isEmpty()) {
+            if (!isIncoming) {
+                // Caller handles restart (§6.2)
+                runOnUiThread {
+                    Log.d(TAG, "Peer requested ICE restart. Restarting ICE as caller...")
+                    callSession?.restartIce()
+                }
+            }
+        }
+    }
+
+    override fun onPeerSignalingLost(msg: PeerSignalingLostMessage) {
+        if (msg.callId == callId || msg.callId.isEmpty()) {
+            runOnUiThread {
+                // S3: Grace period, do NOT terminate media!
+                Log.w(TAG, "Peer lost signaling connection, but media is preserved.")
+                binding.tvCallQualityDots.text = "Signaling reconnecting..."
             }
         }
     }
@@ -265,7 +397,6 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
         if (msg.callId == callId || msg.callId.isEmpty()) {
             Log.d(TAG, "Received SDP offer. Setting remote description and generating answer...")
             runOnUiThread {
-                startTimer()
                 callSession?.setRemoteDescriptionAndAnswer(msg.sdp)
             }
         }
@@ -417,6 +548,7 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     }
 
     private fun cleanupAndExit() {
+        cancelConnectingTimers()
         handler.removeCallbacks(timerRunnable)
         qualityMonitor?.stop()
         if (isSharingScreen) stopScreenSharing()
@@ -447,6 +579,7 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
 
     override fun onDestroy() {
         CallService.instance?.removeSignalingListener(this)
+        cancelConnectingTimers()
         handler.removeCallbacks(timerRunnable)
         super.onDestroy()
     }

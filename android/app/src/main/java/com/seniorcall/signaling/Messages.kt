@@ -14,7 +14,19 @@ data class HelloMessage(
     val turn: List<TurnConfig> = emptyList(),
     val contacts: List<Contact> = emptyList(),
     val serverTime: Long = 0L,
-    val userId: String = ""
+    val userId: String = "",
+    val deviceId: String? = null
+)
+
+data class ResumeMessage(
+    val t: String = "resume",
+    val lastSeq: Long? = null,
+    val activeCallId: String? = null
+)
+
+data class AckMessage(
+    val t: String = "ack",
+    val upTo: Long = 0L
 )
 
 data class CallInviteMessage(
@@ -24,7 +36,14 @@ data class CallInviteMessage(
     val from: String = "",
     val media: String = "video", // audio | video
     val callerName: String? = null,
-    val autoAnswerAllowed: Boolean = false
+    val autoAnswerAllowed: Boolean = false,
+    val sdp: String? = null // Offer SDP (§3.6)
+)
+
+data class CallStateMessage(
+    val t: String = "call_state",
+    val callId: String = "",
+    val state: String = "" // waking | ringing | connecting
 )
 
 data class CallRingingMessage(
@@ -34,13 +53,29 @@ data class CallRingingMessage(
 
 data class CallAcceptMessage(
     val t: String = "call_accept",
-    val callId: String = ""
+    val callId: String = "",
+    val sdp: String? = null // Answer SDP (§3.6)
 )
 
 data class CallRejectMessage(
     val t: String = "call_reject",
     val callId: String = "",
     val reason: String = "declined" // declined | busy
+)
+
+data class CallConnectedMessage(
+    val t: String = "call_connected",
+    val callId: String = ""
+)
+
+data class PeerSignalingLostMessage(
+    val t: String = "peer_signaling_lost",
+    val callId: String = ""
+)
+
+data class IceRestartRequestMessage(
+    val t: String = "ice_restart_request",
+    val callId: String = ""
 )
 
 data class SdpMessage(
@@ -102,7 +137,5 @@ data class ContactsUpdateMessage(
 )
 
 data class GenericMessage(
-    val t: String,
-    val callId: String? = null,
-    val userId: String? = null
+    val t: String = ""
 )

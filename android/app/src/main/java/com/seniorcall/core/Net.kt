@@ -53,13 +53,6 @@ class Net(private val context: Context) {
 
         cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    try {
-                        cm.bindProcessToNetwork(network)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
                 onAvailable()
             }
 

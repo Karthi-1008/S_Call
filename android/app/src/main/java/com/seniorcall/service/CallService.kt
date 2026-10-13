@@ -9,16 +9,11 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.seniorcall.App
-import com.seniorcall.R
 import com.seniorcall.core.*
-import com.seniorcall.data.Contact
 import com.seniorcall.data.ContactStore
 import com.seniorcall.rtc.AudioRouter
 import com.seniorcall.rtc.CallSession
-import com.seniorcall.rtc.RtcEngine
 import com.seniorcall.signaling.*
-import com.seniorcall.ui.CallActivity
 import com.seniorcall.ui.IncomingCallActivity
 import org.webrtc.PeerConnection
 
@@ -38,33 +33,23 @@ class CallService : Service(), SignalingClient.Listener {
 
     private val tag = "CallService"
     lateinit var prefs: Prefs
-    lateinit var net: Net
+    lateinit var networkMonitor: NetworkMonitor
     lateinit var tts: Tts
     lateinit var haptics: Haptics
     lateinit var sounds: Sounds
     lateinit var contactStore: ContactStore
     lateinit var audioRouter: AudioRouter
 
-    var signalingClient: ISignalingClient? = null
+    var signalingClient: SignalingClient? = null
     var activeCallSession: CallSession? = null
     var currentInvite: CallInviteMessage? = null
+
+    // Default STUN servers; TURN credentials populated dynamically via 'hello' message
     var iceServers: List<PeerConnection.IceServer> = listOf(
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
         PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
         PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer(),
-        PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer(),
-        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80")
-            .setUsername("openrelay")
-            .setPassword("openrelay")
-            .createIceServer(),
-        PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443")
-            .setUsername("openrelay")
-            .setPassword("openrelay")
-            .createIceServer(),
-        PeerConnection.IceServer.builder("turns:openrelay.metered.ca:443?transport=tcp")
-            .setUsername("openrelay")
-            .setPassword("openrelay")
-            .createIceServer()
+        PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer()
     )
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -73,7 +58,6 @@ class CallService : Service(), SignalingClient.Listener {
         super.onCreate()
         instance = this
         prefs = Prefs(this)
-        net = Net(this)
         tts = Tts(this)
         haptics = Haptics(this)
         sounds = Sounds(this)
@@ -82,19 +66,20 @@ class CallService : Service(), SignalingClient.Listener {
 
         createNotificationChannels()
         acquireWakeLock()
-        net.acquireWifiLock()
+
+        networkMonitor = NetworkMonitor(this)
+        networkMonitor.setListener(object : NetworkMonitor.Listener {
+            override fun onNetworkAvailable() {
+                Log.d(tag, "Network available via NetworkMonitor, ensuring WebSocket connected")
+                ensureConnected()
+            }
+            override fun onNetworkLost() {
+                Log.d(tag, "Network lost via NetworkMonitor")
+            }
+        })
+        networkMonitor.start()
 
         Watchdog.setupWatchdog(this)
-
-        net.registerNetworkCallback(
-            onAvailable = {
-                Log.d(tag, "Network available, ensuring WebSocket/MQTT connected")
-                ensureConnected()
-            },
-            onLost = {
-                Log.d(tag, "Network lost")
-            }
-        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -114,10 +99,8 @@ class CallService : Service(), SignalingClient.Listener {
     override fun onDestroy() {
         instance = null
         releaseWakeLock()
-        net.releaseWifiLock()
+        networkMonitor.stop()
         signalingClient?.disconnect()
-        LocalSignalingServer.stopInstance()
-        LanManager.unregisterNsdService(this)
         sounds.stopRingtone()
         haptics.stopRingingVibration()
         tts.shutdown()
@@ -125,28 +108,12 @@ class CallService : Service(), SignalingClient.Listener {
     }
 
     fun ensureConnected() {
-        if (prefs.pairKey.isNotEmpty()) {
-            if (signalingClient == null) {
-                signalingClient = MqttSignalingClient(prefs.pairKey, prefs.role, this)
-                signalingClient?.connect()
-            } else if (signalingClient?.isConnected == false) {
-                signalingClient?.connect()
-            }
-            return
-        }
+        val token = prefs.token ?: ""
+        val wsUrl = prefs.wsUrl
+        if (wsUrl.isBlank()) return
 
-        // Fallback for custom server or local mode
-        if (prefs.role == "senior" && prefs.isLanMode) {
-            val code = prefs.pairingCode ?: "123456"
-            if (LocalSignalingServer.instance == null) {
-                LocalSignalingServer.startInstance(8887, code)
-                LanManager.registerNsdService(this, 8887)
-            }
-        }
-
-        val token = prefs.token ?: "lan"
         if (signalingClient == null) {
-            signalingClient = SignalingClient(prefs.wsUrl, token, this)
+            signalingClient = SignalingClient(wsUrl, token, prefs.deviceId, this)
             signalingClient?.connect()
         } else if (signalingClient?.isConnected == false) {
             signalingClient?.connect()
@@ -176,15 +143,13 @@ class CallService : Service(), SignalingClient.Listener {
 
     fun promoteToMediaForeground() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-            } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-            }
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
             startForeground(NOTIFICATION_ID_SERVICE, createServiceNotification(), type)
         }
+    }
+
+    fun demoteToStandbyForeground() {
+        startForegroundWithNotification()
     }
 
     // Signaling Listener Callbacks
@@ -194,13 +159,16 @@ class CallService : Service(), SignalingClient.Listener {
             contactStore.saveContacts(hello.contacts)
         }
         if (hello.turn.isNotEmpty()) {
-            iceServers = hello.turn.flatMap { turn ->
+            val dynamicTurn = hello.turn.flatMap { turn ->
                 turn.urls.map { url ->
                     val builder = PeerConnection.IceServer.builder(url)
                     if (turn.username != null) builder.setUsername(turn.username)
                     if (turn.credential != null) builder.setPassword(turn.credential)
                     builder.createIceServer()
                 }
+            }
+            if (dynamicTurn.isNotEmpty()) {
+                iceServers = dynamicTurn
             }
         }
     }
@@ -225,6 +193,7 @@ class CallService : Service(), SignalingClient.Listener {
         activeCallSession?.dispose()
         activeCallSession = null
         currentInvite = null
+        demoteToStandbyForeground()
     }
 
     fun stopRingingAlerts() {
@@ -242,6 +211,7 @@ class CallService : Service(), SignalingClient.Listener {
             putExtra("callerName", invite.callerName ?: "Family")
             putExtra("media", invite.media)
             putExtra("autoAnswer", invite.autoAnswerAllowed)
+            putExtra("offerSdp", invite.sdp)
         }
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -309,7 +279,7 @@ class CallService : Service(), SignalingClient.Listener {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SeniorCall:CallServiceWakeLock").apply {
             setReferenceCounted(false)
-            acquire(10 * 60 * 1000L) // Safe partial wakelock
+            acquire() // Permanent wake lock for standby, released in onDestroy
         }
     }
 

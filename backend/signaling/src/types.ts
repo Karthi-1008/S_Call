@@ -3,7 +3,7 @@ export type UserRole = 'senior' | 'family';
 export interface UserSession {
   userId: string;
   role: UserRole;
-  pairedWith?: string[]; // IDs of paired contacts
+  pairedWith?: string[];
   fcmToken?: string;
   online: boolean;
   battery?: number;
@@ -20,7 +20,7 @@ export interface ContactInfo {
   language?: string;
 }
 
-export type CallState = 'IDLE' | 'INVITING' | 'RINGING' | 'CONNECTING' | 'CONNECTED' | 'ENDED';
+export type CallState = 'IDLE' | 'INVITING' | 'WAKING' | 'RINGING' | 'CONNECTING' | 'CONNECTED' | 'ENDED';
 
 export interface ActiveCall {
   callId: string;
@@ -34,19 +34,25 @@ export interface ActiveCall {
   timeoutTimer?: NodeJS.Timeout;
 }
 
-// Signaling Protocol Messages (§13.2)
+// Protocol v2 Message Types (§3.6)
 export type SignalingMessageType =
   | 'hello'
+  | 'resume'
+  | 'ack'
   | 'ping'
   | 'pong'
   | 'call_invite'
-  | 'call_ringing'
+  | 'call_state'
   | 'call_accept'
+  | 'call_taken'
   | 'call_reject'
+  | 'ice_restart_request'
   | 'offer'
   | 'answer'
   | 'ice'
   | 'renegotiate'
+  | 'call_connected'
+  | 'peer_signaling_lost'
   | 'screen_request'
   | 'screen_request_reply'
   | 'screen_share_started'
@@ -57,9 +63,11 @@ export type SignalingMessageType =
   | 'error';
 
 export interface BaseMessage {
+  v?: number;
   t: SignalingMessageType;
   id?: string;
   callId?: string;
+  seq?: number;
 }
 
 export interface TurnServerConfig {
@@ -74,31 +82,54 @@ export interface HelloMessage extends BaseMessage {
   contacts: ContactInfo[];
   serverTime: number;
   userId: string;
+  deviceId?: string;
+  turnExpiresAt?: number;
+  resumeFrom?: number;
+}
+
+export interface ResumeMessage extends BaseMessage {
+  t: 'resume';
+  lastSeq?: number;
+  activeCallId?: string;
+}
+
+export interface AckMessage extends BaseMessage {
+  t: 'ack';
+  upTo: number;
 }
 
 export interface CallInviteMessage extends BaseMessage {
   t: 'call_invite';
   to: string;
-  from: string;
+  from?: string;
   media: 'audio' | 'video';
   callerName?: string;
   autoAnswerAllowed?: boolean;
+  sdp?: string; // Offer SDP included in invite (§3.6)
 }
 
-export interface CallRingingMessage extends BaseMessage {
-  t: 'call_ringing';
+export interface CallStateMessage extends BaseMessage {
+  t: 'call_state';
   callId: string;
+  state: 'waking' | 'ringing' | 'connecting';
 }
 
 export interface CallAcceptMessage extends BaseMessage {
   t: 'call_accept';
   callId: string;
+  sdp?: string; // Answer SDP included in accept (§3.6)
+}
+
+export interface CallTakenMessage extends BaseMessage {
+  t: 'call_taken';
+  callId: string;
+  by: string;
 }
 
 export interface CallRejectMessage extends BaseMessage {
   t: 'call_reject';
   callId: string;
-  reason: 'declined' | 'busy';
+  reason: 'declined' | 'busy' | string;
 }
 
 export interface SdpMessage extends BaseMessage {
@@ -115,6 +146,11 @@ export interface IceCandidateMessage extends BaseMessage {
   sdpMLineIndex: number;
 }
 
+export interface IceRestartRequestMessage extends BaseMessage {
+  t: 'ice_restart_request';
+  callId: string;
+}
+
 export interface RenegotiateMessage extends BaseMessage {
   t: 'renegotiate';
   callId: string;
@@ -122,10 +158,25 @@ export interface RenegotiateMessage extends BaseMessage {
   type: string;
 }
 
+export interface CallConnectedMessage extends BaseMessage {
+  t: 'call_connected';
+  callId: string;
+  pair?: {
+    local?: string;
+    remote?: string;
+    protocol?: string;
+  };
+}
+
+export interface PeerSignalingLostMessage extends BaseMessage {
+  t: 'peer_signaling_lost';
+  callId: string;
+}
+
 export interface ScreenRequestMessage extends BaseMessage {
   t: 'screen_request';
   callId: string;
-  from: string;
+  from?: string;
 }
 
 export interface ScreenRequestReplyMessage extends BaseMessage {
@@ -151,7 +202,7 @@ export interface PresenceMessage extends BaseMessage {
   userId: string;
   online: boolean;
   battery?: number;
-  lastSeen: number;
+  lastSeen?: number;
 }
 
 export interface ContactsUpdateMessage extends BaseMessage {
@@ -167,14 +218,19 @@ export interface ErrorMessage extends BaseMessage {
 
 export type SignalingMessage =
   | HelloMessage
-  | BaseMessage
+  | ResumeMessage
+  | AckMessage
   | CallInviteMessage
-  | CallRingingMessage
+  | CallStateMessage
   | CallAcceptMessage
+  | CallTakenMessage
   | CallRejectMessage
+  | IceRestartRequestMessage
   | SdpMessage
   | IceCandidateMessage
   | RenegotiateMessage
+  | CallConnectedMessage
+  | PeerSignalingLostMessage
   | ScreenRequestMessage
   | ScreenRequestReplyMessage
   | ScreenShareStateMessage

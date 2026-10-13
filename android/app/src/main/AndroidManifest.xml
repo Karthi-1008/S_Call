@@ -14,7 +14,6 @@
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
@@ -37,7 +36,7 @@
         android:roundIcon="@android:drawable/ic_menu_call"
         android:supportsRtl="true"
         android:theme="@style/Theme.SeniorCall"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
 
         <!-- HOME Launcher Activity (§12 / §14.2) -->
         <activity
@@ -97,7 +96,7 @@
         <service
             android:name=".service.CallService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|phoneCall|microphone|camera">
+            android:foregroundServiceType="specialUse|microphone|camera">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Always-on WebSocket signaling connection for senior emergency calls" />

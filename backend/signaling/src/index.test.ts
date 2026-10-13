@@ -212,4 +212,61 @@ test('SeniorCall Signaling Integration Test', async (t) => {
     elderWs.close();
     familyWs.close();
   });
+
+  // 5. Offer-in-Invite and offline callee queueing / resume
+  await t.test('Offer-in-Invite and offline callee queueing / resume', async () => {
+    // Connect familyWs only (elder is offline)
+    const familyWs = new WebSocket(`${wsUrl}?token=${familyToken}`);
+    const familyMessages: any[] = [];
+    familyWs.on('message', data => familyMessages.push(JSON.parse(data.toString())));
+    await new Promise(res => familyWs.on('open', res));
+    await new Promise(r => setTimeout(r, 100));
+
+    // Family invites elder with Offer SDP while elder is offline
+    familyWs.send(JSON.stringify({
+      t: 'call_invite',
+      to: elderId,
+      media: 'video',
+      sdp: 'v=0\r\no=family-offer-sdp',
+    }));
+
+    await new Promise(r => setTimeout(r, 100));
+    assert.ok(familyMessages.some(m => m.t === 'call_state' && m.state === 'waking'));
+
+    // Now elder connects
+    const elderWs = new WebSocket(`${wsUrl}?token=${elderToken}`);
+    const elderMessages: any[] = [];
+    elderWs.on('message', data => elderMessages.push(JSON.parse(data.toString())));
+    await new Promise(res => elderWs.on('open', res));
+    await new Promise(r => setTimeout(r, 150));
+
+    // Elder should receive the queued call_invite with the Offer SDP
+    const queuedInvite = elderMessages.find(m => m.t === 'call_invite');
+    assert.ok(queuedInvite, 'Elder should receive queued call_invite on connect');
+    assert.strictEqual(queuedInvite.sdp, 'v=0\r\no=family-offer-sdp');
+
+    // Elder accepts with Answer SDP
+    elderWs.send(JSON.stringify({
+      t: 'call_accept',
+      callId: queuedInvite.callId,
+      sdp: 'v=0\r\no=elder-answer-sdp',
+    }));
+
+    await new Promise(r => setTimeout(r, 100));
+    const acceptMsg = familyMessages.find(m => m.t === 'call_accept');
+    assert.ok(acceptMsg, 'Family should receive call_accept with answer sdp');
+    assert.strictEqual(acceptMsg.sdp, 'v=0\r\no=elder-answer-sdp');
+
+    // Clean up call
+    elderWs.send(JSON.stringify({
+      t: 'call_end',
+      callId: queuedInvite.callId,
+      reason: 'test_done',
+    }));
+
+    await new Promise(r => setTimeout(r, 100));
+    familyWs.close();
+    elderWs.close();
+  });
 });
+

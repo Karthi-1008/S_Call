@@ -21,13 +21,29 @@ class ContactStore(private val context: Context) {
         get() = File(context.filesDir, "contacts_cache.json")
 
     fun getContacts(): List<Contact> {
-        return try {
-            if (!contactsFile.exists()) return emptyList()
-            val json = contactsFile.readText()
-            val type = object : TypeToken<List<Contact>>() {}.type
-            gson.fromJson<List<Contact>>(json, type) ?: emptyList()
+        val cached = try {
+            if (!contactsFile.exists()) emptyList()
+            else {
+                val json = contactsFile.readText()
+                val type = object : TypeToken<List<Contact>>() {}.type
+                gson.fromJson<List<Contact>>(json, type) ?: emptyList()
+            }
         } catch (e: Exception) {
             emptyList()
+        }
+
+        return if (cached.isEmpty()) {
+            listOf(
+                Contact(
+                    id = "usr_family",
+                    name = "Family",
+                    role = "family",
+                    priority = 1,
+                    autoAnswerAllowed = true
+                )
+            )
+        } else {
+            cached
         }
     }
 

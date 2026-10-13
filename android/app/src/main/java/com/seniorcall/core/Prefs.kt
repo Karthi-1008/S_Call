@@ -14,17 +14,25 @@ class Prefs(context: Context) {
         get() = sp.getString("user_role", "senior") ?: "senior"
         set(value) = sp.edit().putString("user_role", value).apply()
 
+    var isLanMode: Boolean
+        get() = sp.getBoolean("is_lan_mode", true)
+        set(value) = sp.edit().putBoolean("is_lan_mode", value).apply()
+
     var userId: String?
         get() = sp.getString("user_id", null)
         set(value) = sp.edit().putString("user_id", value).apply()
 
     var token: String?
-        get() = sp.getString("jwt_token", null)
+        get() = sp.getString("jwt_token", "") ?: ""
         set(value) = sp.edit().putString("jwt_token", value).apply()
 
     var serverUrl: String
-        get() = sp.getString("server_url", "http://10.0.2.2:8080") ?: "http://10.0.2.2:8080"
+        get() = sp.getString("server_url", "") ?: ""
         set(value) = sp.edit().putString("server_url", value).apply()
+
+    var pairingCode: String?
+        get() = sp.getString("pairing_code", null)
+        set(value) = sp.edit().putString("pairing_code", value).apply()
 
     var kioskPin: String
         get() = sp.getString("kiosk_pin", "1234") ?: "1234"
@@ -40,7 +48,20 @@ class Prefs(context: Context) {
 
     val wsUrl: String
         get() {
-            val base = serverUrl.replace("http://", "ws://").replace("https://", "wss://")
-            return "$base/ws"
+            var url = serverUrl.trim()
+            if (url.isEmpty()) {
+                val ip = LanManager.getLocalIpAddress() ?: "127.0.0.1"
+                return "ws://$ip:8887"
+            }
+            if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
+                url = url.replace("http://", "ws://").replace("https://", "wss://")
+                if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
+                    url = "ws://$url"
+                }
+            }
+            if (!url.endsWith("/ws") && !url.contains(":8887")) {
+                url = if (url.endsWith("/")) "${url}ws" else "$url/ws"
+            }
+            return url
         }
 }

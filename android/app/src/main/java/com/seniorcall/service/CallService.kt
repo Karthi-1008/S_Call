@@ -101,6 +101,8 @@ class CallService : Service(), SignalingClient.Listener {
         releaseWakeLock()
         net.releaseWifiLock()
         signalingClient?.disconnect()
+        LocalSignalingServer.stopInstance()
+        LanManager.unregisterNsdService(this)
         sounds.stopRingtone()
         haptics.stopRingingVibration()
         tts.shutdown()
@@ -108,11 +110,30 @@ class CallService : Service(), SignalingClient.Listener {
     }
 
     fun ensureConnected() {
-        val token = prefs.token ?: return
+        // In LAN mode on senior role, start local WebSocket server if not running
+        if (prefs.role == "senior" && prefs.isLanMode) {
+            val code = prefs.pairingCode ?: "123456"
+            if (LocalSignalingServer.instance == null) {
+                LocalSignalingServer.startInstance(8887, code)
+                LanManager.registerNsdService(this, 8887)
+            }
+        }
+
+        val token = prefs.token ?: "lan"
         if (signalingClient == null) {
             signalingClient = SignalingClient(prefs.wsUrl, token, this)
             signalingClient?.connect()
+        } else if (signalingClient?.isConnected == false) {
+            signalingClient?.connect()
         }
+    }
+
+    fun addSignalingListener(l: SignalingClient.Listener) {
+        signalingClient?.addListener(l)
+    }
+
+    fun removeSignalingListener(l: SignalingClient.Listener) {
+        signalingClient?.removeListener(l)
     }
 
     private fun startForegroundWithNotification() {
@@ -172,35 +193,6 @@ class CallService : Service(), SignalingClient.Listener {
         sounds.startRingtone()
         haptics.startRingingVibration()
         tts.speak("$callerName is calling. Press the green button to answer.")
-
-        // 3. Pre-warm early ICE (§11.1)
-        preWarmSession()
-    }
-
-    private fun preWarmSession() {
-        val rtcEngine = (application as App).rtcEngine
-        activeCallSession = CallSession(this, rtcEngine, iceServers, object : CallSession.Listener {
-            override fun onIceCandidate(candidate: org.webrtc.IceCandidate) {
-                val callId = currentInvite?.callId ?: return
-                signalingClient?.send(
-                    IceCandidateMessage(
-                        callId = callId,
-                        candidate = candidate.sdp,
-                        sdpMid = candidate.sdpMid,
-                        sdpMLineIndex = candidate.sdpMLineIndex
-                    )
-                )
-            }
-
-            override fun onLocalDescription(sdp: org.webrtc.SessionDescription) {
-                val callId = currentInvite?.callId ?: return
-                signalingClient?.send(SdpMessage(t = "answer", callId = callId, sdp = sdp.description))
-            }
-
-            override fun onRemoteVideoTrack(track: org.webrtc.VideoTrack) {}
-            override fun onRemoteScreenTrack(track: org.webrtc.VideoTrack) {}
-            override fun onConnectionStateChange(state: PeerConnection.PeerConnectionState) {}
-        })
     }
 
     override fun onCallEnd(end: CallEndMessage) {

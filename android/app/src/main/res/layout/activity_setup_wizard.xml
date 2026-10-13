@@ -9,12 +9,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="20dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/setup_title"
+            android:text="SeniorCall Setup"
             android:textColor="@color/senior_text_primary"
             android:textSize="32sp"
             android:textStyle="bold" />
@@ -22,8 +22,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Choose how this phone will be used:"
+            android:layout_marginTop="6dp"
+            android:text="Choose phone role:"
             android:textColor="@color/senior_text_secondary"
             android:textSize="20sp" />
 
@@ -32,104 +32,256 @@
             android:id="@+id/rgRole"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="12dp">
 
             <RadioButton
                 android:id="@+id/rbRoleSenior"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
+                android:layout_height="56dp"
                 android:checked="true"
-                android:text="@string/setup_senior_mode"
-                android:textSize="22sp" />
+                android:text="Elder / Senior Phone (Always On)"
+                android:textSize="20sp" />
 
             <RadioButton
                 android:id="@+id/rbRoleFamily"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:text="@string/setup_family_mode"
-                android:textSize="22sp" />
+                android:layout_height="56dp"
+                android:text="Family / Caregiver Phone"
+                android:textSize="20sp" />
         </RadioGroup>
-
-        <!-- Server URL Setting -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Signaling Server URL:"
-            android:textColor="@color/senior_text_secondary"
-            android:textSize="18sp" />
-
-        <EditText
-            android:id="@+id/etServerUrl"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:hint="http://10.0.2.2:8080"
-            android:inputType="textUri"
-            android:padding="12dp"
-            android:textSize="18sp" />
 
         <!-- Permissions Section -->
         <Button
             android:id="@+id/btnGrantPermissions"
             style="@style/SeniorButton"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
-            android:layout_marginTop="20dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/bg_btn_neutral"
-            android:text="Grant Permissions (Camera/Mic)"
-            android:textSize="20sp" />
+            android:text="Grant Camera &amp; Mic Permissions"
+            android:textSize="18sp" />
 
-        <!-- Pairing Section -->
+        <!-- ELDER MODE SECTION -->
         <LinearLayout
-            android:id="@+id/layoutPairing"
+            android:id="@+id/layoutSeniorSetup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:gravity="center"
+            android:layout_marginTop="20dp"
             android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/pairing_code_label"
+                android:text="Connection Mode:"
                 android:textColor="@color/senior_text_secondary"
-                android:textSize="22sp"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <RadioGroup
+                android:id="@+id/rgSeniorMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <RadioButton
+                    android:id="@+id/rbSeniorLan"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:checked="true"
+                    android:text="Direct Wi-Fi Mode (No server needed)"
+                    android:textSize="17sp" />
+
+                <RadioButton
+                    android:id="@+id/rbSeniorServer"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="Central Server Mode (Custom URL)"
+                    android:textSize="17sp" />
+            </RadioGroup>
+
+            <!-- Custom server input (hidden by default) -->
+            <LinearLayout
+                android:id="@+id/layoutSeniorServerInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/etSeniorServerUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="http://192.168.1.50:8080"
+                    android:inputType="textUri"
+                    android:padding="12dp"
+                    android:textSize="16sp" />
+
+                <Button
+                    android:id="@+id/btnSeniorConnectServer"
+                    style="@style/SeniorButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_btn_neutral"
+                    android:text="Connect to Server"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvSeniorStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="#DCFCE7"
+                android:padding="10dp"
+                android:text="🟢 Local Wi-Fi Active: Ready to Pair"
+                android:textColor="#16A34A"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tvPairingCode"
+                android:id="@+id/tvSeniorIp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Wi-Fi IP: Detecting..."
+                android:textColor="@color/senior_text_secondary"
+                android:textSize="16sp" />
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="12dp"
+                android:text="Pairing Code:"
+                android:textColor="@color/senior_text_secondary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSeniorPairCode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="4dp"
                 android:text="------"
                 android:textColor="@color/color_blue_video"
-                android:textSize="48sp"
+                android:textSize="44sp"
                 android:textStyle="bold" />
 
             <ImageView
-                android:id="@+id/imgPairingQr"
-                android:layout_width="200dp"
-                android:layout_height="200dp"
-                android:layout_marginTop="16dp"
-                android:contentDescription="QR Code" />
+                android:id="@+id/imgSeniorQr"
+                android:layout_width="220dp"
+                android:layout_height="220dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:contentDescription="Pairing QR Code" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="Scan this QR code with the Family phone"
+                android:textColor="@color/senior_text_secondary"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <!-- FAMILY MODE SECTION -->
+        <LinearLayout
+            android:id="@+id/layoutFamilySetup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:text="@string/pairing_instructions"
+                android:text="Pair with Elder's Phone:"
                 android:textColor="@color/senior_text_secondary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnFamilyScanQr"
+                style="@style/SeniorButton"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_btn_video"
+                android:text="📷 Scan Elder's QR Code"
+                android:textSize="22sp" />
+
+            <Button
+                android:id="@+id/btnFamilyAutoDiscover"
+                style="@style/SeniorButton"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_btn_neutral"
+                android:text="🔍 Auto-Discover on Wi-Fi"
                 android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="— OR Enter Elder Details Manually —"
+                android:textColor="@color/senior_text_secondary"
+                android:textSize="16sp" />
+
+            <EditText
+                android:id="@+id/etFamilyServerOrIp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="Elder IP (e.g. 192.168.1.15:8887) or Server URL"
+                android:inputType="textUri"
+                android:padding="12dp"
+                android:textSize="16sp" />
+
+            <EditText
+                android:id="@+id/etFamilyPairCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="6-Digit Pairing PIN"
+                android:inputType="number"
+                android:padding="12dp"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnFamilyPairManual"
+                style="@style/SeniorButton"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_btn_voice"
+                android:text="🔗 Link &amp; Pair with Elder"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/tvFamilyPairStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="#FEF3C7"
+                android:padding="12dp"
+                android:text="⚠️ Not Paired: Scan QR or enter code above"
+                android:textColor="#D97706"
+                android:textSize="16sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <Button
             android:id="@+id/btnFinishSetup"
             style="@style/SeniorButton"
             android:layout_width="match_parent"
-            android:layout_height="96dp"
-            android:layout_marginTop="32dp"
+            android:layout_height="80dp"
+            android:layout_marginTop="28dp"
+            android:layout_marginBottom="24dp"
             android:background="@drawable/bg_btn_answer"
             android:text="Complete Setup"
             android:textSize="24sp" />

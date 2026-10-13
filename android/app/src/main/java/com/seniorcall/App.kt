@@ -46,7 +46,7 @@ class App : Application() {
     }
 
     fun startCallServiceIfConfigured() {
-        if (prefs.isSetupComplete && prefs.token != null) {
+        if (prefs.isSetupComplete) {
             val intent = Intent(this, CallService::class.java).apply {
                 action = CallService.ACTION_START_ALWAYS_ON
             }

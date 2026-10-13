@@ -499,8 +499,11 @@ export function createSignalingServer() {
       case 'screen_share_started':
       case 'screen_share_stopped': {
         const call = getCall(msg.callId);
-        if (call) {
-          const peerId = call.callerId === fromUserId ? call.calleeId : call.callerId;
+        let peerId = call ? (call.callerId === fromUserId ? call.calleeId : call.callerId) : msg.to;
+        if (!peerId && user) {
+          peerId = Array.from(user.pairedUsers)[0];
+        }
+        if (peerId) {
           const peerSocket = getSocket(peerId);
           if (peerSocket && peerSocket.readyState === WebSocket.OPEN) {
             peerSocket.send(JSON.stringify(msg));

@@ -4,6 +4,7 @@
     <string name="status_ready">✅ Ready to receive calls</string>
     <string name="status_offline">⚠️ No internet — please check Wi-Fi</string>
     <string name="status_connecting">🔄 Connecting...</string>
+    <string name="status_calling">📞 Calling…</string>
 
     <!-- Home Actions -->
     <string name="btn_video">🎥 VIDEO</string>

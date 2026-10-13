@@ -10,7 +10,7 @@ class CallSession(
     private val context: Context,
     private val rtcEngine: RtcEngine,
     private val iceServers: List<PeerConnection.IceServer>,
-    private val listener: Listener
+    private var listener: Listener
 ) {
     interface Listener {
         fun onIceCandidate(candidate: IceCandidate)
@@ -32,8 +32,15 @@ class CallSession(
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var screenSender: RtpSender? = null
 
+    private var isRemoteDescriptionSet = false
+    private val pendingIceCandidates = mutableListOf<IceCandidate>()
+
     init {
         createPeerConnection()
+    }
+
+    fun setListener(listener: Listener) {
+        this.listener = listener
     }
 
     private fun createPeerConnection() {
@@ -86,7 +93,11 @@ class CallSession(
             videoCapturer = createCameraCapturer()
             val videoSource = rtcEngine.createVideoSource(false)
             videoCapturer?.initialize(surfaceTextureHelper, context, videoSource.capturerObserver)
-            videoCapturer?.startCapture(640, 480, 24)
+            try {
+                videoCapturer?.startCapture(640, 480, 24)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to start camera capture", e)
+            }
 
             localVideoTrack = rtcEngine.peerConnectionFactory.createVideoTrack("video-0", videoSource)
             localSink?.let { localVideoTrack?.addSink(it) }
@@ -111,6 +122,8 @@ class CallSession(
         val sessionDesc = SessionDescription(SessionDescription.Type.OFFER, remoteSdp)
         peerConnection?.setRemoteDescription(object : SdpObserverAdapter() {
             override fun onSetSuccess() {
+                isRemoteDescriptionSet = true
+                drainPendingIceCandidates()
                 peerConnection?.createAnswer(object : SdpObserverAdapter() {
                     override fun onCreateSuccess(desc: SessionDescription?) {
                         if (desc == null) return
@@ -127,11 +140,29 @@ class CallSession(
 
     fun setRemoteAnswer(remoteSdp: String) {
         val sessionDesc = SessionDescription(SessionDescription.Type.ANSWER, remoteSdp)
-        peerConnection?.setRemoteDescription(SdpObserverAdapter(), sessionDesc)
+        peerConnection?.setRemoteDescription(object : SdpObserverAdapter() {
+            override fun onSetSuccess() {
+                isRemoteDescriptionSet = true
+                drainPendingIceCandidates()
+            }
+        }, sessionDesc)
     }
 
     fun addRemoteIceCandidate(candidate: IceCandidate) {
-        peerConnection?.addIceCandidate(candidate)
+        if (isRemoteDescriptionSet) {
+            peerConnection?.addIceCandidate(candidate)
+        } else {
+            pendingIceCandidates.add(candidate)
+        }
+    }
+
+    private fun drainPendingIceCandidates() {
+        mainHandler.post {
+            for (c in pendingIceCandidates) {
+                peerConnection?.addIceCandidate(c)
+            }
+            pendingIceCandidates.clear()
+        }
     }
 
     fun addScreenTrack(screenTrack: VideoTrack) {
@@ -179,7 +210,11 @@ class CallSession(
     }
 
     private fun createCameraCapturer(): CameraVideoCapturer? {
-        val enumerator = Camera2Enumerator(context)
+        val enumerator = if (Camera2Enumerator.isSupported(context)) {
+            Camera2Enumerator(context)
+        } else {
+            Camera1Enumerator(true)
+        }
         val deviceNames = enumerator.deviceNames
         for (deviceName in deviceNames) {
             if (enumerator.isFrontFacing(deviceName)) {

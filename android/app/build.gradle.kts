@@ -84,6 +84,7 @@ dependencies {
     // Networking & WebSocket
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7")
 
     // QR Code Generation & Scanning (lightweight)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")

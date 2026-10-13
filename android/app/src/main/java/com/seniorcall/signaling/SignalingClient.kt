@@ -10,13 +10,14 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
 
 class SignalingClient(
     private val wsUrl: String,
     private val token: String,
-    private val listener: Listener
+    initialListener: Listener? = null
 ) {
     interface Listener {
         fun onConnected(hello: HelloMessage) {}
@@ -41,6 +42,21 @@ class SignalingClient(
     private val tag = "SignalingClient"
     private val gson = Gson()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val listeners = CopyOnWriteArrayList<Listener>()
+
+    init {
+        initialListener?.let { listeners.add(it) }
+    }
+
+    fun addListener(l: Listener) {
+        if (!listeners.contains(l)) {
+            listeners.add(l)
+        }
+    }
+
+    fun removeListener(l: Listener) {
+        listeners.remove(l)
+    }
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .pingInterval(15, TimeUnit.SECONDS)
@@ -53,6 +69,9 @@ class SignalingClient(
     private var isClosedManually = false
     private var reconnectAttempt = 0
 
+    var isConnected: Boolean = false
+        private set
+
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             send(mapOf("t" to "ping"))
@@ -62,12 +81,18 @@ class SignalingClient(
 
     fun connect() {
         isClosedManually = false
-        val urlWithToken = if (wsUrl.contains("?")) "$wsUrl&token=$token" else "$wsUrl?token=$token"
+        val urlWithToken = if (token.isNotBlank()) {
+            if (wsUrl.contains("?")) "$wsUrl&token=$token" else "$wsUrl?token=$token"
+        } else {
+            wsUrl
+        }
+        Log.d(tag, "Connecting to WebSocket: $urlWithToken")
         val request = Request.Builder().url(urlWithToken).build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(tag, "WebSocket opened successfully")
+                isConnected = true
                 reconnectAttempt = 0
                 mainHandler.post(heartbeatRunnable)
             }
@@ -78,15 +103,21 @@ class SignalingClient(
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(tag, "WebSocket closed: $code / $reason")
+                isConnected = false
                 mainHandler.removeCallbacks(heartbeatRunnable)
-                mainHandler.post { listener.onDisconnected() }
+                mainHandler.post {
+                    listeners.forEach { it.onDisconnected() }
+                }
                 scheduleReconnect()
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(tag, "WebSocket error: ${t.message}")
+                isConnected = false
                 mainHandler.removeCallbacks(heartbeatRunnable)
-                mainHandler.post { listener.onDisconnected() }
+                mainHandler.post {
+                    listeners.forEach { it.onDisconnected() }
+                }
                 scheduleReconnect()
             }
         })
@@ -95,7 +126,6 @@ class SignalingClient(
     private fun scheduleReconnect() {
         if (isClosedManually) return
         reconnectAttempt++
-        // Exponential backoff capped at 5s (§13.2 / §9.3 A1)
         val delayMs = min(1000L * (1L shl min(reconnectAttempt, 3)), 5000L)
         Log.d(tag, "Reconnecting in ${delayMs}ms (attempt $reconnectAttempt)")
         mainHandler.postDelayed({ connect() }, delayMs)
@@ -108,6 +138,7 @@ class SignalingClient(
 
     fun disconnect() {
         isClosedManually = true
+        isConnected = false
         mainHandler.removeCallbacks(heartbeatRunnable)
         webSocket?.close(1000, "Normal closure")
         webSocket = null
@@ -118,27 +149,71 @@ class SignalingClient(
             val generic = gson.fromJson(json, GenericMessage::class.java) ?: return
             mainHandler.post {
                 when (generic.t) {
-                    "hello" -> listener.onConnected(gson.fromJson(json, HelloMessage::class.java))
-                    "call_invite" -> listener.onCallInvite(gson.fromJson(json, CallInviteMessage::class.java))
-                    "call_ringing" -> listener.onCallRinging(gson.fromJson(json, CallRingingMessage::class.java))
-                    "call_accept" -> listener.onCallAccept(gson.fromJson(json, CallAcceptMessage::class.java))
-                    "call_reject" -> listener.onCallReject(gson.fromJson(json, CallRejectMessage::class.java))
-                    "offer" -> listener.onOffer(gson.fromJson(json, SdpMessage::class.java))
-                    "answer" -> listener.onAnswer(gson.fromJson(json, SdpMessage::class.java))
-                    "ice" -> listener.onIceCandidate(gson.fromJson(json, IceCandidateMessage::class.java))
-                    "renegotiate" -> listener.onRenegotiate(gson.fromJson(json, RenegotiateMessage::class.java))
-                    "screen_request" -> listener.onScreenRequest(gson.fromJson(json, ScreenRequestMessage::class.java))
-                    "screen_request_reply" -> listener.onScreenRequestReply(gson.fromJson(json, ScreenRequestReplyMessage::class.java))
-                    "screen_share_started", "screen_share_stopped" -> listener.onScreenShareState(gson.fromJson(json, ScreenShareStateMessage::class.java))
-                    "call_end" -> listener.onCallEnd(gson.fromJson(json, CallEndMessage::class.java))
-                    "presence" -> listener.onPresence(gson.fromJson(json, PresenceMessage::class.java))
+                    "hello" -> {
+                        val hello = gson.fromJson(json, HelloMessage::class.java)
+                        listeners.forEach { it.onConnected(hello) }
+                    }
+                    "call_invite" -> {
+                        val invite = gson.fromJson(json, CallInviteMessage::class.java)
+                        listeners.forEach { it.onCallInvite(invite) }
+                    }
+                    "call_ringing" -> {
+                        val ringing = gson.fromJson(json, CallRingingMessage::class.java)
+                        listeners.forEach { it.onCallRinging(ringing) }
+                    }
+                    "call_accept" -> {
+                        val accept = gson.fromJson(json, CallAcceptMessage::class.java)
+                        listeners.forEach { it.onCallAccept(accept) }
+                    }
+                    "call_reject" -> {
+                        val reject = gson.fromJson(json, CallRejectMessage::class.java)
+                        listeners.forEach { it.onCallReject(reject) }
+                    }
+                    "offer" -> {
+                        val sdp = gson.fromJson(json, SdpMessage::class.java)
+                        listeners.forEach { it.onOffer(sdp) }
+                    }
+                    "answer" -> {
+                        val sdp = gson.fromJson(json, SdpMessage::class.java)
+                        listeners.forEach { it.onAnswer(sdp) }
+                    }
+                    "ice" -> {
+                        val ice = gson.fromJson(json, IceCandidateMessage::class.java)
+                        listeners.forEach { it.onIceCandidate(ice) }
+                    }
+                    "renegotiate" -> {
+                        val ren = gson.fromJson(json, RenegotiateMessage::class.java)
+                        listeners.forEach { it.onRenegotiate(ren) }
+                    }
+                    "screen_request" -> {
+                        val req = gson.fromJson(json, ScreenRequestMessage::class.java)
+                        listeners.forEach { it.onScreenRequest(req) }
+                    }
+                    "screen_request_reply" -> {
+                        val rep = gson.fromJson(json, ScreenRequestReplyMessage::class.java)
+                        listeners.forEach { it.onScreenRequestReply(rep) }
+                    }
+                    "screen_share_started", "screen_share_stopped" -> {
+                        val state = gson.fromJson(json, ScreenShareStateMessage::class.java)
+                        listeners.forEach { it.onScreenShareState(state) }
+                    }
+                    "call_end" -> {
+                        val end = gson.fromJson(json, CallEndMessage::class.java)
+                        listeners.forEach { it.onCallEnd(end) }
+                    }
+                    "presence" -> {
+                        val pres = gson.fromJson(json, PresenceMessage::class.java)
+                        listeners.forEach { it.onPresence(pres) }
+                    }
                     "contacts_update" -> {
                         val update = gson.fromJson(json, ContactsUpdateMessage::class.java)
-                        listener.onContactsUpdate(update.contacts)
+                        listeners.forEach { it.onContactsUpdate(update.contacts) }
                     }
                     "error" -> {
                         val map = gson.fromJson(json, Map::class.java)
-                        listener.onError(map["code"]?.toString() ?: "UNKNOWN", map["message"]?.toString() ?: "")
+                        listeners.forEach {
+                            it.onError(map["code"]?.toString() ?: "UNKNOWN", map["message"]?.toString() ?: "")
+                        }
                     }
                 }
             }

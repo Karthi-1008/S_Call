@@ -4,6 +4,7 @@
     <string name="status_ready">✅ कॉल प्राप्त करने के लिए तैयार</string>
     <string name="status_offline">⚠️ इंटरनेट नहीं है — कृपया वाई-फाई जांचें</string>
     <string name="status_connecting">🔄 जुड़ रहा है...</string>
+    <string name="status_calling">📞 कॉल की जा रही है…</string>
 
     <string name="btn_video">🎥 वीडियो</string>
     <string name="btn_voice">📞 ऑडियो</string>

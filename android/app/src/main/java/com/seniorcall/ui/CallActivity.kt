@@ -8,8 +8,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.seniorcall.App
 import com.seniorcall.R
@@ -29,6 +31,7 @@ import org.webrtc.VideoTrack
 
 class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     companion object {
+        private const val TAG = "CallActivity"
         private const val REQUEST_MEDIA_PROJECTION = 1001
         private const val REQUEST_CONSENT_ACTIVITY = 1002
     }
@@ -96,6 +99,11 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
         binding.localSurfaceRenderer.setMirror(true)
         binding.localSurfaceRenderer.setZOrderMediaOverlay(true)
 
+        if (mediaType == "audio") {
+            binding.localSurfaceRenderer.visibility = View.GONE
+            binding.remoteSurfaceRenderer.visibility = View.GONE
+        }
+
         // Control buttons
         binding.btnMute.setOnClickListener {
             haptics.tick()
@@ -129,40 +137,50 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     }
 
     private fun setupWebRTC() {
-        val service = CallService.instance ?: return
+        val service = CallService.instance ?: run {
+            Toast.makeText(this, "Call service unavailable", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
         service.audioRouter.startCallAudio()
 
-        // Reuse pre-warmed session if incoming, or create new
-        callSession = service.activeCallSession ?: CallSession(
+        // Register signaling listener
+        service.addSignalingListener(this)
+
+        // Initialize CallSession
+        callSession = CallSession(
             this,
             (application as App).rtcEngine,
             service.iceServers,
             createSessionListener()
         )
+        service.activeCallSession = callSession
 
         callSession?.setupLocalMedia(
             videoEnabled = mediaType == "video",
             localSink = binding.localSurfaceRenderer
         )
 
-        // Register signaling listener
-        service.signalingClient?.let { sc ->
-            // Point client listener to this activity
-        }
-
         if (!isIncoming) {
+            binding.tvCallDuration.text = getString(R.string.status_calling)
             // Outgoing call invite
+            val myRole = service.prefs.role
+            val myName = if (myRole == "senior") "Elder Phone" else "Family Member"
+            val myId = service.prefs.userId ?: if (myRole == "senior") "usr_elder" else "usr_family"
+
             service.signalingClient?.send(
                 CallInviteMessage(
                     callId = callId,
                     to = targetUserId,
-                    from = service.prefs.userId ?: "",
+                    from = myId,
                     media = mediaType,
-                    callerName = "Elder Phone"
+                    callerName = myName
                 )
             )
         } else {
-            startTimer()
+            // Incoming call answered, callee notifies acceptance
+            service.signalingClient?.send(CallAcceptMessage(callId = callId))
+            binding.tvCallDuration.text = "Connecting..."
         }
 
         // Start quality monitor
@@ -173,7 +191,6 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
                 }
 
                 override fun onLowBandwidthFallback() {
-                    // Friendly downgrade to voice-only (§11.4)
                     binding.remoteSurfaceRenderer.visibility = View.GONE
                     binding.localSurfaceRenderer.visibility = View.GONE
                 }
@@ -184,6 +201,7 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     private fun createSessionListener(): CallSession.Listener {
         return object : CallSession.Listener {
             override fun onIceCandidate(candidate: IceCandidate) {
+                Log.d(TAG, "Sending local ICE candidate: ${candidate.sdpMid}")
                 CallService.instance?.signalingClient?.send(
                     IceCandidateMessage(
                         callId = callId,
@@ -196,12 +214,14 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
 
             override fun onLocalDescription(sdp: SessionDescription) {
                 val type = if (sdp.type == SessionDescription.Type.OFFER) "offer" else "answer"
+                Log.d(TAG, "Sending local SDP description: $type")
                 CallService.instance?.signalingClient?.send(
                     SdpMessage(t = type, callId = callId, sdp = sdp.description)
                 )
             }
 
             override fun onRemoteVideoTrack(track: VideoTrack) {
+                Log.d(TAG, "Remote video track received")
                 runOnUiThread {
                     track.addSink(binding.remoteSurfaceRenderer)
                     binding.remoteSurfaceRenderer.visibility = View.VISIBLE
@@ -209,6 +229,7 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
             }
 
             override fun onRemoteScreenTrack(track: VideoTrack) {
+                Log.d(TAG, "Remote screen track received")
                 runOnUiThread {
                     track.addSink(binding.screenSurfaceRenderer)
                     binding.screenSurfaceRenderer.visibility = View.VISIBLE
@@ -217,12 +238,88 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
             }
 
             override fun onConnectionStateChange(state: PeerConnection.PeerConnectionState) {
-                if (state == PeerConnection.PeerConnectionState.CONNECTED) {
-                    runOnUiThread { startTimer() }
-                } else if (state == PeerConnection.PeerConnectionState.DISCONNECTED ||
-                    state == PeerConnection.PeerConnectionState.FAILED) {
-                    // Try ICE restart (§9.1 F8)
-                    callSession?.restartIce()
+                Log.d(TAG, "WebRTC connection state: $state")
+                runOnUiThread {
+                    if (state == PeerConnection.PeerConnectionState.CONNECTED) {
+                        startTimer()
+                    } else if (state == PeerConnection.PeerConnectionState.FAILED) {
+                        callSession?.restartIce()
+                    }
+                }
+            }
+        }
+    }
+
+    // SignalingClient.Listener Callbacks
+    override fun onCallAccept(accept: CallAcceptMessage) {
+        if (accept.callId == callId || accept.callId.isEmpty()) {
+            Log.d(TAG, "Callee accepted call. Creating SDP offer...")
+            runOnUiThread {
+                startTimer()
+                callSession?.createOffer()
+            }
+        }
+    }
+
+    override fun onOffer(msg: SdpMessage) {
+        if (msg.callId == callId || msg.callId.isEmpty()) {
+            Log.d(TAG, "Received SDP offer. Setting remote description and generating answer...")
+            runOnUiThread {
+                startTimer()
+                callSession?.setRemoteDescriptionAndAnswer(msg.sdp)
+            }
+        }
+    }
+
+    override fun onAnswer(msg: SdpMessage) {
+        if (msg.callId == callId || msg.callId.isEmpty()) {
+            Log.d(TAG, "Received SDP answer. Setting remote answer...")
+            runOnUiThread {
+                callSession?.setRemoteAnswer(msg.sdp)
+            }
+        }
+    }
+
+    override fun onIceCandidate(ice: IceCandidateMessage) {
+        if (ice.callId == callId || ice.callId.isEmpty()) {
+            callSession?.addRemoteIceCandidate(
+                IceCandidate(ice.sdpMid, ice.sdpMLineIndex, ice.candidate)
+            )
+        }
+    }
+
+    override fun onCallReject(reject: CallRejectMessage) {
+        if (reject.callId == callId || reject.callId.isEmpty()) {
+            runOnUiThread {
+                Toast.makeText(this, "Call declined (${reject.reason})", Toast.LENGTH_SHORT).show()
+                cleanupAndExit()
+            }
+        }
+    }
+
+    override fun onCallEnd(end: CallEndMessage) {
+        if (end.callId == callId || end.callId.isEmpty()) {
+            runOnUiThread {
+                cleanupAndExit()
+            }
+        }
+    }
+
+    override fun onScreenRequest(req: ScreenRequestMessage) {
+        runOnUiThread {
+            val intent = Intent(this, ShareConsentActivity::class.java).apply {
+                putExtra("callerName", targetName)
+            }
+            startActivityForResult(intent, REQUEST_CONSENT_ACTIVITY)
+        }
+    }
+
+    override fun onScreenShareState(state: ScreenShareStateMessage) {
+        runOnUiThread {
+            if (state.t == "screen_share_stopped") {
+                binding.screenSurfaceRenderer.visibility = View.GONE
+                if (mediaType == "video") {
+                    binding.remoteSurfaceRenderer.visibility = View.VISIBLE
                 }
             }
         }
@@ -253,7 +350,6 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_MEDIA_PROJECTION && resultCode == Activity.RESULT_OK && data != null) {
-            // Android 10+ requires ForegroundService type mediaProjection first (§10 #2)
             val fgIntent = Intent(this, ScreenShareService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(fgIntent)
@@ -325,6 +421,8 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
         qualityMonitor?.stop()
         if (isSharingScreen) stopScreenSharing()
 
+        CallService.instance?.removeSignalingListener(this)
+
         callSession?.dispose()
         callSession = null
         CallService.instance?.activeCallSession = null
@@ -348,6 +446,7 @@ class CallActivity : AppCompatActivity(), SignalingClient.Listener {
     }
 
     override fun onDestroy() {
+        CallService.instance?.removeSignalingListener(this)
         handler.removeCallbacks(timerRunnable)
         super.onDestroy()
     }
